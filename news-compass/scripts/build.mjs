@@ -1,0 +1,11 @@
+import { mkdir, cp, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+const root = resolve(import.meta.dirname, '..');
+await mkdir(resolve(root, 'dist'), { recursive: true });
+await cp(resolve(root, 'web'), resolve(root, 'dist'), { recursive: true });
+await cp(resolve(root, 'shared'), resolve(root, 'dist/shared'), { recursive: true });
+await writeFile(resolve(root, 'dist/.nojekyll'), '');
+const apiBase = process.env.PUBLIC_API_BASE ?? '';
+if (apiBase && new URL(apiBase).protocol !== 'https:') throw new Error('PUBLIC_API_BASE must use HTTPS');
+await writeFile(resolve(root, 'dist/config.mjs'), 'export const DEFAULT_API_BASE = ' + JSON.stringify(apiBase) + ';\n');
+console.log('Sitio estático generado en dist/. No se incluyen secretos ni ejecuciones.');

@@ -1,0 +1,17 @@
+{
+  "name": "news-compass",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.19.0" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "worker:check": "wrangler deploy --dry-run --outdir .worker-build",
+    "worker:deploy": "wrangler deploy"
+  },
+  "dependencies": { "@mozilla/readability": "^0.6.0", "linkedom": "^0.18.12" },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

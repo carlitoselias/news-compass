@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "news-compass-api",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2026-10-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "vars": {
+    "AI_ENABLED": "false",
+    "BUDGET_READY": "false",
+    "OPENAI_MODEL": "gpt-6.1-sol",
+    "ALLOWED_ORIGIN": "https://carlitoselias.github.io"
+  },
+  "durable_objects": { "bindings": [{ "name": "DEMO_GATE", "class_name": "DemoGate" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DemoGate"] }],
+  "observability": { "enabled": false }
+}

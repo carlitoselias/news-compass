@@ -1,0 +1,4 @@
+# Private source brief and local continuity; never publish.
+REQUISITOS.md
+**/.codex/
+*.log

@@ -1,0 +1,7 @@
+# No se usa en npm run dev: la vista previa siempre mantiene el gasto desactivado.
+AI_ENABLED=false
+BUDGET_READY=false
+OPENAI_MODEL=gpt-6.1-sol
+OPENAI_API_KEY=
+DEMO_ACCESS_TOKEN=
+ALLOWED_ORIGIN=http://127.0.0.1:4173

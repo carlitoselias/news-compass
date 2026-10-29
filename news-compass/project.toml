@@ -1,0 +1,36 @@
+schema_version = 1
+template_version = "0.2.0"
+
+[project]
+name = "News Compass"
+slug = "news-compass"
+summary = "Demostrar en una charla, con noticias nuevas en vivo, como una IA compara coberturas y genera una sintesis verificable con fuentes y omisiones."
+profile = "web-app"
+stage = "prototype"
+language = "es"
+owner = "personal"
+data_class = "public"
+workspace_policy = "split-code-data"
+remote_policy = "public-remote"
+first_outcome = "Loreto abre la web en GitHub Pages, introduce una noticia nueva, revisa y selecciona coberturas reales, genera una respuesta citada, examina omisiones y exporta o recupera una ejecucion guardada; un Worker protege el acceso a OpenAI."
+acceptance = "Comprobaciones locales sin gasto; un ensayo API autorizado con noticia no precargada; evidencia trazable a fuentes seleccionadas; errores y accesos parciales visibles; respaldo recuperable; secretos ausentes del sitio; limites de consumo configurados antes de habilitar llamadas."
+
+[governance]
+backlog = "docs/BACKLOG.md"
+decisions = "docs/DECISIONS.md"
+
+[continuity]
+mode = "backlog-handoff"
+backlog = "docs/BACKLOG.md"
+active_handoff = ".codex/handoff.md"
+archive_dir = ".codex/handoffs"
+create_on = "first-substantive-close"
+
+[runtimes]
+node = "24.19.0"
+
+[commands]
+verify = ["npm run check", "npm test", "npm run build"]
+
+[environment]
+keys = ["OPENAI_API_KEY", "OPENAI_MODEL", "DEMO_ACCESS_TOKEN", "ALLOWED_ORIGIN", "AI_ENABLED", "BUDGET_READY", "PUBLIC_API_BASE"]
