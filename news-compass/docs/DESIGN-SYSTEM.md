@@ -1,6 +1,6 @@
 # Sistema visual — Editorial rojo
 
-Fecha: 29 de octubre de 2026. Dirección elegida por Loreto: blanco, negro y rojo. Implementación local sobre la refactorización UX existente. Fuente de verdad de los valores: `web/styles.css`.
+Fecha: 29 de octubre de 2026. Dirección elegida por Loreto: blanco, negro y rojo. Implementación publicada sobre la refactorización UX existente (46c37d7; Actions 40914007892). Fuente de verdad de los valores: `web/styles.css`.
 
 ## Principio de diseño
 
@@ -95,4 +95,4 @@ El objetivo es facilitar la lectura. No es correcto asegurar que cualquier proye
 
 ## Alcance y validación
 
-La capa visual no cambia el contrato de API ni el formato de archivos. La refactorización de UX previa continúa en revisión. La evidencia de pruebas y las observaciones del segundo agente se registran en `docs/VALIDATION.md`. La implementación no implica publicación ni aceptación del ensayo real.
+La capa visual no cambia el contrato de API ni el formato de archivos. La refactorización de UX previa continúa en revisión. La evidencia de pruebas y las observaciones del segundo agente se registran en `docs/VALIDATION.md`. La versión está publicada en https://carlitoselias.github.io/news-compass/. La publicación no implica aceptación del ensayo real.

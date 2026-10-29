@@ -62,3 +62,10 @@ Implementado sobre la refactorización UX previa. Paleta, tamaños, componentes,
 - Revisión independiente por otro agente, solo lectura: recorrido ficticio, cita, proyección, código y capturas. Sin defectos P1. Corrigió dos observaciones: P2, nombres de casillas ambiguos con titulares idénticos; P3, hover de pestañas y citas fuera de la condición documentada. El revisor confirmó ambos arreglos y no dejó defectos relevantes de los detectados.
 
 Límites: validación local con datos ficticios, no ensayo con noticias reales. No se usó un lector de pantalla ni un proyector físico. La medida de contraste digital no garantiza lectura a distancia. La implementación visual no publica los cambios ni da por aceptada la demo real.
+## Publicación de UX y sistema editorial — 29 de octubre de 2026
+
+La usuaria autorizó pasar los cambios a main y usar la versión pública. Commit de aplicación: `46c37d71614f3462cd685b8a239087db6d26ea23`. GitHub Actions [40914007892](https://github.com/carlitoselias/news-compass/actions/runs/40914007892) completó las 31 pruebas, el build y el despliegue de Pages.
+
+Web verificada: https://carlitoselias.github.io/news-compass/. El navegador confirma el acento #C51F30, Georgia en titulares, los controles de la nueva UX, navegación con flecha derecha y Home, y el modo Proyectar. Ancho efectivo de 373 px sin desbordamiento horizontal. Consola sin errores ni advertencias observados. El diálogo incluye la URL pública del Worker. No se introdujeron credenciales ni se hicieron llamadas de pago para esta comprobación. La publicación no modifica el Worker ni su configuración privada.
+
+Se conservan como pendientes la prueba física de proyección y la revisión de claridad con la usuaria. La nueva web puede usarse directamente sin el servidor local.
