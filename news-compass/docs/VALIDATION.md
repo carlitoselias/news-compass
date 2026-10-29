@@ -26,3 +26,9 @@ La coincidencia textual de una cita no demuestra que una afirmación sea verdade
 ## Entorno Windows
 
 La ruta de OneDrive impide que el proceso nativo de esbuild abra algunos archivos. La compilación del Worker se realizó desde una copia temporal de worker/, shared/ y wrangler.jsonc con las mismas dependencias fijadas. El sitio estático y las pruebas sí se ejecutaron en el proyecto. No se modificaron permisos de OneDrive.
+
+## Publicación comprobada
+
+GitHub Actions [40892090417](https://github.com/carlitoselias/news-compass/actions/runs/40892090417) completó instalación, 17 pruebas, build y Pages. La web pública carga las tres vistas; navegación con flechas/Home y modo de proyección comprobados. Consola sin errores observados. Worker versión a49cc696-9b03-48ad-93fe-54fe9a27f6cf con /health operativo. No se introdujeron claves OpenAI ni se hicieron llamadas a ese proveedor.
+
+La usuaria decidió dejar las claves para el ensayo. La demo sigue sin aceptación final de su recorrido con IA real.

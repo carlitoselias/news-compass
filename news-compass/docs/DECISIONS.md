@@ -10,3 +10,5 @@
 - **ADR-008 — Dependencias.** Interfaz sin framework, librerías ni recursos remotos. Readability y LinkeDOM en el servidor para extraer texto público. Wrangler solo como herramienta de desarrollo/despliegue. package-lock.json fija versiones.
 - **ADR-009 — Repositorio.** La aplicación vive en news-compass/ dentro del repositorio padre existente. No se crea otro .git. Workflow manual de Pages en la raíz.
 - **ADR-010 — Validación honesta.** Pruebas con datos ficticios solo dentro de tests/output. Ningún modo de simulación aparece como IA real. La prueba con saldo está pendiente de autorización.
+
+- **ADR-011 — Publicación autorizada.** Repositorio público carlitoselias/news-compass, Pages y Worker publicados el 29 de octubre. La propietaria autorizó Wrangler y luego decidió dejar las claves para el ensayo. No activar llamadas ni crear secretos hasta retomar esa etapa.

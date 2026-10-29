@@ -2,7 +2,7 @@
 
 Demo en español para una charla: noticia → coberturas → respuesta citada → fuentes y omisiones.
 
-**Estado:** implementación verificada sin gasto; servidor publicado en https://news-compass-api.c-elias-pp.workers.dev. Las llamadas de pago están desactivadas. La aceptación final requiere la configuración privada y un ensayo API expresamente autorizado. No se ha gastado saldo de OpenAI.
+**Estado:** [web publicada](https://carlitoselias.github.io/news-compass/) y servidor publicado en https://news-compass-api.c-elias-pp.workers.dev; implementación verificada sin gasto. Las llamadas de pago están desactivadas. La aceptación final requiere la configuración privada y un ensayo API expresamente autorizado. No se ha gastado saldo de OpenAI.
 
 ## Abrir y comprobar
 
