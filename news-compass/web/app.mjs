@@ -1,349 +1,289 @@
 import { DEFAULT_API_BASE } from './config.mjs';
-import { validateArchive, publicURL } from './shared/evidence.mjs';
+import { validateArchive, publicURL, summarySource } from './shared/evidence.mjs';
 
 const $ = id => document.getElementById(id);
-const state = { corpus: null, selected: new Set(), answer: null, omissions: null, saved: false, busy: false, dirty: false, downloaded: false, view: 'coverage',
-  base: DEFAULT_API_BASE, access: '', enabled: false, connected: false };
-function el(tag, text, cls) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (cls) node.className = cls; return node; }
-function safeLink(text, url, cls) {
-  const a = el('a', text, cls); a.href = publicURL(url); a.target = '_blank'; a.rel = 'noopener noreferrer'; a.setAttribute('aria-label', `${text} (abre en otra pestaña)`); return a;
+const SESSION_KEY = 'news-compass-connection';
+const state = { corpus:null, selected:new Set(), suggestion:null, draftQuestion:'', answer:null, omissions:null,
+  saved:false, busy:false, dirty:false, view:'coverage', base:DEFAULT_API_BASE, access:'', connected:false, enabled:false };
+function el(tag, text, cls) { const n=document.createElement(tag); if(text!==undefined) n.textContent=text; if(cls) n.className=cls; return n; }
+function link(text,url) { const n=el('a',text); n.href=publicURL(url); n.target='_blank'; n.rel='noopener noreferrer'; return n; }
+function error(message) { $('error').textContent=message; $('error').hidden=!message; if(message) { $('error').tabIndex=-1; $('error').focus(); } }
+function progress(message) { $('feedback').textContent=message; $('feedback').hidden=!message; $('feedback').classList.toggle('busy',state.busy); }
+function persistConnection() {
+  try {
+    if(state.connected) sessionStorage.setItem(SESSION_KEY,JSON.stringify({base:state.base,access:state.access}));
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch { /* In restricted browsers the current page still keeps its connection in memory. */ }
 }
-function showError(message) { $('error').textContent = message; $('error').hidden = !message; if (message) { $('error').tabIndex = -1; $('error').focus(); } }
-function progress(message) { $('feedback').textContent = message; $('feedback').hidden = !message; $('feedback').classList.toggle('busy', state.busy); }
-function answerIsCurrent() {
-  return Boolean(state.answer && (state.answer.question ?? '').trim() === $('question').value.trim() &&
-    state.answer.selectedIds.length === state.selected.size && state.answer.selectedIds.every(id => state.selected.has(id)));
+function currentSuggestion() {
+  return state.suggestion && state.suggestion.selectedIds.length===state.selected.size && state.suggestion.selectedIds.every(id=>state.selected.has(id));
 }
 function controls() {
-  const current = answerIsCurrent();
-  $('search').disabled = state.busy || !state.enabled || $('news-input').value.trim().length < 20;
-  $('generate').disabled = state.busy || !state.enabled || !state.selected.size || state.saved || !$('question').value.trim();
-  $('find-omissions').disabled = state.busy || !state.enabled || !state.answer?.claims.length || !current || Boolean(state.omissions) || state.saved;
-  $('export').disabled = state.busy || !state.corpus;
-  for (const button of document.querySelectorAll('[data-download]')) button.disabled = state.busy;
-  $('import').disabled = state.busy; $('new-run').disabled = state.busy;
-  $('news-input').disabled = state.busy; $('question').disabled = state.busy || state.saved || !state.corpus;
-  $('configure').disabled = state.busy;
-  $('selection-count').textContent = `${state.selected.size} fuente${state.selected.size === 1 ? '' : 's'} seleccionada${state.selected.size === 1 ? '' : 's'}`;
-  $('source-count').textContent = state.corpus?.articles.length ?? '—';
-  for (const box of document.querySelectorAll('[data-source]')) box.disabled = state.busy || state.saved || box.dataset.readable !== 'true';
-  $('input-hint').textContent = !state.connected ? 'Primero pulsa “Conectar IA”, o abre un archivo guardado. Conectar no consume IA.' : !state.enabled ? 'El servidor tiene la IA desactivada. Puedes abrir un archivo guardado.' : 'Busca hasta 6 coberturas y compara sus textos con IA. Esta acción consume crédito. Introduce al menos 20 caracteres.';
-  $('generate-help').textContent = state.saved ? 'Archivo abierto en modo lectura. Para generar otra respuesta, inicia una nueva búsqueda.' : !state.corpus ? 'Primero busca una noticia en el paso 1.' : !state.selected.size ? 'Selecciona al menos una fuente con texto en “1. Elegir fuentes”.' : !state.enabled ? 'Conecta y habilita la IA para generar. Puedes seguir leyendo las fuentes.' : !$('question').value.trim() ? 'Escribe una pregunta para continuar.' : 'Usa solo las fuentes seleccionadas. Consume crédito. Cambiar la pregunta no genera una respuesta automáticamente.';
-  $('generate').textContent = state.busy ? 'Espera a que termine…' : state.answer ? 'Generar otra respuesta con IA' : 'Generar respuesta con IA';
-  $('omissions-help').textContent = !state.answer ? (state.saved ? 'Este archivo no contiene una respuesta para analizar.' : 'Primero genera una respuesta en el paso 2.') : !current ? (state.saved ? 'Las citas corresponden a la respuesta anterior del archivo. El modo lectura no genera omisiones nuevas.' : 'La selección o la pregunta cambió. Genera una nueva respuesta antes de analizar sus omisiones.') : state.omissions ? 'Análisis de IA disponible debajo de las citas. Revisa sus fragmentos de respaldo.' : state.saved ? 'Este archivo no incluye omisiones. El modo lectura no genera contenido nuevo.' : !state.answer.claims.length ? 'La respuesta no tiene afirmaciones suficientes para analizar omisiones.' : !state.enabled ? 'Conecta la IA para analizar omisiones. Las citas ya se pueden leer.' : 'Opcional: compara la respuesta con los textos seleccionados para buscar matices que quedaron fuera. Consume crédito.';
-  $('save-status').textContent = !state.corpus ? 'Sin guardado automático' : state.saved ? 'Archivo abierto · solo lectura' : state.dirty ? 'Cambios sin descargar' : state.downloaded ? 'Descarga solicitada · comprueba el archivo' : 'Sin guardado automático';
-  $('export').textContent = state.downloaded && state.dirty ? 'Descargar versión actual' : 'Descargar archivo';
-  document.querySelector('.workspace').setAttribute('aria-busy', String(state.busy));
-  updateGuide();
+  $('entry-panel').hidden=Boolean(state.corpus);
+  $('workspace').hidden=!state.corpus;
+  $('new-run').hidden=!state.corpus;
+  $('home').disabled=state.busy;
+  $('new-run').disabled=state.busy;
+  $('configure').disabled=state.busy;
+  $('configure').classList.toggle('connected',state.connected);
+  const label=state.connected?'Conexión: '+(state.enabled?'IA conectada':'IA no disponible'):'Conectar';
+  $('configure').setAttribute('aria-label',label); $('configure').title=label;
+  // Submitting without a connection opens login and preserves the entry.
+  $('search').disabled=state.busy || $('news-input').value.trim().length<5;
+  $('news-input').disabled=state.busy; $('import').disabled=state.busy;
+  $('export').disabled=state.busy || !state.corpus;
+  $('suggest').disabled=state.busy || !state.enabled || !state.selected.size || state.saved || !state.corpus?.overview;
+  $('suggest').textContent=state.suggestion?'Proponer otra pregunta ↗':'Proponer una pregunta ↗';
+  $('suggest-help').textContent=state.saved?'Ejecución guardada · solo lectura.':!state.corpus?.overview?'Este archivo antiguo no contiene un resumen inicial.':!state.selected.size?'Selecciona al menos una fuente en «La noticia».':!state.enabled?'Conecta la IA para proponer una pregunta.':'Usa tu selección y el resumen inicial. Esta acción consume API.';
+  for(const box of document.querySelectorAll('[data-source]')) box.disabled=state.busy||state.saved;
+  if($('suggested-question')) $('suggested-question').disabled=state.busy||state.saved;
+  $('workspace').setAttribute('aria-busy',String(state.busy));
+  $('settings-form').hidden=state.connected; $('connected-panel').hidden=!state.connected;
+  $('settings-title').textContent=state.connected?'Conexión':'Conectar la demo';
+  $('connected-status').textContent=state.enabled?'IA conectada. Puedes iniciar nuevas búsquedas.':'Sesión conectada. La IA no está disponible en este momento.';
 }
-function updateGuide() {
-  let title, description, label, action;
-  if (state.busy) {
-    title = 'La IA está trabajando'; description = 'Puedes leer las vistas. Espera antes de iniciar otra acción. Mantén esta página abierta.'; label = 'En curso…';
-  } else if (!state.corpus) {
-    if (!state.connected) { title = 'Empieza por conectar la IA'; description = 'Conectar no consume crédito. También puedes abrir un archivo guardado sin conectar.'; label = 'Conectar IA'; action = () => $('configure').click(); }
-    else if (!state.enabled) { title = 'IA desactivada en el servidor'; description = 'Puedes revisar un archivo guardado. Las búsquedas requieren que la IA esté habilitada.'; label = 'Abrir archivo guardado'; action = () => $('import').click(); }
-    else { title = 'Introduce la noticia de partida'; description = 'Pega un enlace o texto. Después pulsa “Buscar y comparar con IA”.'; label = 'Ir a la noticia'; action = () => $('news-input').focus(); }
-  } else if (state.saved) {
-    title = 'Estás leyendo un archivo guardado'; description = 'Explora las tres vistas sin consumir IA. El contenido disponible depende de lo que se guardó.';
-    label = state.view === 'coverage' && state.answer ? 'Ver respuesta guardada' : state.view === 'response' ? 'Revisar citas' : 'Ver fuentes';
-    action = () => goTo(state.view === 'coverage' && state.answer ? 'response' : state.view === 'response' ? 'evidence' : 'coverage');
-    if (!state.answer) {
-      title = 'Este archivo contiene solo coberturas'; description = 'Puedes leerlas en el paso 1. Para generar una respuesta, inicia una nueva búsqueda.';
-      label = 'Nueva búsqueda'; action = () => $('new-run').click();
+function showView(view, focus=false) {
+  state.view=view;
+  $('coverage').hidden=view!=='coverage'; $('question-screen').hidden=view!=='question';
+  for(const [id,name] of [['show-coverage','coverage'],['show-question','question']]) {
+    $(id).classList.toggle('active',view===name);
+    if(view===name) $(id).setAttribute('aria-current','page'); else $(id).removeAttribute('aria-current');
+  }
+  if(focus) { const node=$(view==='coverage'?'coverage':'question-screen'); node.focus(); node.scrollIntoView({block:'start'}); }
+}
+function source(id) { return id==='ai-summary'?summarySource(state.corpus):state.corpus.articles.find(a=>a.id===id); }
+function evidenceBlock(e) {
+  const a=source(e.sourceId), b=el('blockquote',undefined,'quote');
+  b.append(el('div','“'+e.quote+'”'));
+  if(a?.url) b.append(link(a.medium+' · Ver publicación ↗',a.url));
+  else b.append(el('span','Resumen inicial de IA · contenido derivado'));
+  return b;
+}
+function observation(item) {
+  const n=el('div',undefined,'observation'), p=el('p',item.text,'claim-text'), details=el('details',undefined,'evidence');
+  details.append(el('summary','Ver fragmentos'));
+  const seen=new Set();
+  for(const e of item.evidence) {
+    const block=evidenceBlock(e); details.append(block);
+    if(seen.has(e.sourceId)) continue; seen.add(e.sourceId);
+    const a=source(e.sourceId), citation=el('button',a?.medium||e.sourceId,'citation');
+    citation.setAttribute('aria-label','Ver cita de '+(a?.medium||e.sourceId));
+    citation.addEventListener('click',()=>{ details.open=true; block.tabIndex=-1; block.focus(); block.scrollIntoView({block:'nearest'}); });
+    p.append(document.createTextNode(' '),citation);
+  }
+  n.append(p,details); return n;
+}
+function renderOverview() {
+  const root=$('overview-content'); root.replaceChildren();
+  if(!state.corpus) return;
+  const c=state.corpus, sheet=el('article',undefined,'overview');
+  sheet.append(el('p','RESUMEN DE IA · CON FUENTES','eyebrow'),el('h1',c.event.name));
+  if(c.searchNotice) sheet.append(el('p',c.searchNotice,'notice'));
+  if(c.overview?.sections) {
+    for(const section of c.overview.sections) {
+      sheet.append(el('h2',section.heading));
+      for(const claim of section.claims) sheet.append(observation(claim));
     }
-  } else if (!state.selected.size) {
-    title = 'Elige al menos una fuente con texto'; description = 'Las fuentes sin texto suficiente no se pueden usar. Si no hay ninguna disponible, inicia otra búsqueda.'; label = 'Revisar fuentes'; action = () => goTo('coverage');
-  } else if (!state.answer || !answerIsCurrent()) {
-    title = state.answer ? 'Tu respuesta anterior sigue disponible' : `${state.selected.size} fuentes listas para tu pregunta`;
-    description = state.answer ? 'Cambiaste la pregunta o las fuentes. Genera otra respuesta cuando estés conforme.' : 'Revisa las casillas “Usar en respuesta”. Después escribe tu pregunta en el paso 2.';
-    label = 'Ir a la pregunta'; action = () => { goTo('response'); $('question').focus(); };
-  } else if (state.view !== 'evidence') {
-    title = 'La respuesta está lista para revisar'; description = 'Comprueba los fragmentos que respaldan cada afirmación. Revisarlos no consume IA.'; label = 'Revisar citas'; action = () => goTo('evidence');
-  } else {
-    title = state.omissions ? 'Revisa los matices antes de terminar' : 'Revisa las citas; las omisiones son opcionales';
-    description = 'Si quieres conservar este trabajo, descarga un archivo. No necesitas descargar para cambiar de vista.'; label = 'Descargar archivo'; action = downloadArchive;
-  }
-  $('next-title').textContent = title; $('next-description').textContent = description;
-  $('next-action').textContent = label; $('next-action').disabled = state.busy; $('next-action').onclick = action;
-}
-function goTo(name) {
-  tab(name, true); $(name).scrollIntoView({ block: 'start', behavior: 'auto' });
-}
-function markChanged() { if (state.corpus && !state.saved) state.dirty = true; }
-function tab(name, focus = false) {
-  state.view = name; updateGuide();
-  for (const b of document.querySelectorAll('[data-tab]')) {
-    const active = b.dataset.tab === name; b.setAttribute('aria-selected', String(active)); b.tabIndex = active ? 0 : -1;
-    $(b.dataset.tab).hidden = !active;
-    if (active && focus) b.focus();
-  }
-}
-for (const b of document.querySelectorAll('[data-tab]')) {
-  b.addEventListener('click', () => tab(b.dataset.tab));
-  b.addEventListener('keydown', e => {
-    const names = ['coverage', 'response', 'evidence']; let index = names.indexOf(b.dataset.tab);
-    if (e.key === 'ArrowRight') index = (index + 1) % 3;
-    else if (e.key === 'ArrowLeft') index = (index + 2) % 3;
-    else if (e.key === 'Home') index = 0; else if (e.key === 'End') index = 2; else return;
-    e.preventDefault(); tab(names[index], true);
-  });
-}
-function sourceById(id) { return state.corpus.articles.find(a => a.id === id); }
-function quoteBlock(e) {
-  const a = sourceById(e.sourceId); const block = el('blockquote', undefined, 'quote');
-  block.append(el('span', 'Cita del medio · fragmento literal', 'content-label source-label'), el('div', `“${e.quote}”`), safeLink(`${a.id.toUpperCase()} · ${a.medium || new URL(a.url).hostname} ↗`, a.url));
-  return block;
-}
-function observation(item, { folded = false } = {}) {
-  const node = el('div', undefined, 'observation'); const p = el('p', item.text);
-  const quotes = folded ? el('details') : el('div');
-  if (folded) quotes.append(el('summary', 'Ver fragmentos de respaldo'));
-  const used = new Set();
-  for (const e of item.evidence) {
-    const block = quoteBlock(e); quotes.append(block);
-    if (used.has(e.sourceId)) continue; used.add(e.sourceId);
-    const citation = el('button', `[${e.sourceId.toUpperCase()}]`, 'inline-citation');
-    citation.setAttribute('aria-label', `Ver fragmento de ${e.sourceId.toUpperCase()} que respalda esta afirmación`);
-    citation.addEventListener('click', () => {
-      if (folded) quotes.open = true;
-      block.tabIndex = -1; block.focus(); block.scrollIntoView({ block: 'nearest', behavior: 'auto' });
-    });
-    p.append(citation);
-  }
-  node.append(p, quotes); return node;
-}
-function observationList(parent, items, empty = 'Sin evidencia suficiente para señalar un hallazgo.') {
-  if (!items?.length) { parent.append(el('p', empty, 'small-note')); return; }
-  for (const item of items) parent.append(observation(item));
-}
-function emptyCoverage() {
-  const wrap = el('div'); const intro = el('div', undefined, 'empty-intro');
-  intro.append(el('h2', 'El recorrido, a la vista.'), el('p', 'Conecta la demo para empezar, o abre una ejecución guardada.'));
-  const grid = el('div', undefined, 'journey');
-  for (const [symbol, title, text] of [['≋', 'Las distintas miradas', 'Revisa qué cuenta cada publicación y elige las fuentes.'], ['↗', 'La respuesta que construye', 'Observa cómo la IA conecta la información seleccionada.'], ['◎', 'Los matices que quedan fuera', 'Vuelve a los textos y examina las decisiones de síntesis.']]) {
-    const card = el('article'); card.append(el('span', symbol, 'glyph'), el('h3', title), el('p', text)); grid.append(card);
-  }
-  wrap.append(intro, grid); return wrap;
-}
-function renderCoverage() {
-  const root = $('coverage-content'); root.replaceChildren();
-  if (!state.corpus) { root.append(emptyCoverage()); return; }
-  const c = state.corpus; const event = el('div', undefined, 'event-card');
-  event.append(el('p', 'IDENTIFICACIÓN GENERADA POR IA · COMPRUEBA EL ACONTECIMIENTO', 'eyebrow'), el('h2', c.event.name));
-  const meta = el('div', undefined, 'event-meta');
-  meta.append(el('span', `Fecha del acontecimiento: ${c.event.date || 'no confirmada'}`), el('span', c.event.people.join(' · ')));
-  event.append(meta);
-  for (const uncertainty of c.event.uncertainties) event.append(el('p', uncertainty, 'uncertainty'));
-  const input = el('details', undefined, 'seed-details'); input.append(el('summary', 'Ver la noticia de partida'), el('p', c.input)); event.append(input);
-  root.append(event);
-  const legend = el('div', undefined, 'content-legend');
-  legend.append(el('span', 'FUENTE · Texto extraído del medio', 'content-label source-label'), el('span', 'IA · Resumen e interpretación', 'content-label ai-label'));
-  root.append(legend, el('p', state.saved ? 'Archivo de solo lectura. Las casillas muestran la selección guardada.' : 'Las fuentes con texto están seleccionadas al inicio. Desmarca las que no quieras usar. Leer los textos y cambiar la selección no consume IA.', 'section-note'));
-  const heading = el('div', undefined, 'section-heading'); heading.append(el('h2', `${c.articles.length} coberturas para examinar.`), el('span', state.saved ? 'Selección guardada · solo lectura' : 'Selecciona las fuentes antes de generar', 'small-note')); root.append(heading);
-  if (c.articles.length < 4) root.append(el('p', 'La búsqueda encontró menos de cuatro publicaciones verificables. No se completó la lista con resultados ajenos.', 'section-note'));
-  const grid = el('div', undefined, 'sources-grid');
-  for (const a of c.articles) {
-    const card = el('article', undefined, `source-card${state.selected.has(a.id) ? ' selected' : ''}`);
-    const top = el('div', undefined, 'source-top'); top.append(el('span', `${a.id.toUpperCase()} · ${a.medium || new URL(a.url).hostname}`, 'source-id'));
-    const label = el('label', undefined, 'select-source'); const box = el('input'); box.type = 'checkbox'; box.dataset.source = a.id;
-    box.dataset.readable = String(a.access !== 'unavailable' && a.text.length >= 80); box.checked = state.selected.has(a.id); box.setAttribute('aria-label', `${state.saved ? (state.selected.has(a.id) ? 'Seleccionada' : 'No seleccionada') : 'Usar en respuesta'}: ${a.id.toUpperCase()} · ${a.medium || new URL(a.url).hostname} · ${a.title}`);
-    box.addEventListener('change', () => { box.checked ? state.selected.add(a.id) : state.selected.delete(a.id); markChanged();
-      card.classList.toggle('selected', box.checked); renderAnswer(); renderEvidence(); controls(); });
-    label.append(box, document.createTextNode(state.saved ? (state.selected.has(a.id) ? 'Seleccionada' : 'No seleccionada') : 'Usar en respuesta')); top.append(label); card.append(top);
-    const h = el('h3'); h.append(safeLink(a.title || 'Abrir publicación', a.url)); card.append(h);
-    card.append(el('p', `Publicación: ${a.date || 'fecha no disponible'}${a.dateOrigin === 'search' ? ' · fecha aportada por la búsqueda' : ''}`, 'metadata'));
-    card.append(el('span', { read: 'Texto disponible', partial: 'Acceso parcial', unavailable: 'No se pudo leer' }[a.access], `access ${a.access}`));
-    card.append(el('p', a.accessNote, 'small-note'));
-    if (a.access === 'unavailable' || a.text.length < 80) card.append(el('p', 'No seleccionable: falta texto suficiente para generar una respuesta.', 'small-note'));
-    card.append(safeLink('Abrir publicación original ↗', a.url, 'original-link'));
-    if (a.analysis) {
-      const details = el('details'); details.append(el('summary', 'IA · Ver análisis de esta cobertura'));
-      for (const [key, title] of [['facts', 'Hechos destacados'], ['voices', 'Voces y fuentes utilizadas'], ['context', 'Contexto que aporta'], ['focus', 'Enfoque'], ['agency', 'Posibles reproducciones o agencias']]) {
-        details.className = 'ai-analysis'; details.append(el('h4', title, 'analysis-heading')); observationList(details, a.analysis[key]);
-      }
-      card.append(details);
-    }
-    if (a.text) { const details = el('details'); details.append(el('summary', 'FUENTE · Leer texto extraído del medio'), el('div', a.text, 'read-text')); card.append(details); }
-    grid.append(card);
-  }
-  root.append(grid);
-  const compare = el('section', undefined, 'comparison'); compare.append(el('span', 'GENERADO POR IA', 'content-label ai-label'), el('h2', 'Comparación de coberturas'), el('p', 'Interpretación de la IA sobre todas las coberturas encontradas. Cambiar la selección solo afecta a la respuesta del paso 2.', 'section-note'));
-  const comparisonGrid = el('div', undefined, 'comparison-grid');
-  for (const [key, title] of [['agreements', 'Coincidencias'], ['differences', 'Diferencias'], ['contradictions', 'Contradicciones']]) {
-    const column = el('div'); column.append(el('h3', title)); observationList(column, c.comparison[key]); comparisonGrid.append(column);
-  }
-  compare.append(comparisonGrid); root.append(compare);
-  const next = el('div', undefined, 'action-row'); next.append(el('p', 'Revisa la selección. Cada artículo puede aportar una voz distinta.'));
-  const button = el('button', state.saved ? 'Ver respuesta guardada →' : 'Ir al paso 2: tu pregunta →', 'primary'); button.addEventListener('click', () => { goTo('response'); }); next.append(button); root.append(next);
-}
-function renderAnswer() {
-  const root = $('answer-content'); root.replaceChildren();
-  if (!state.answer) { root.append(el('p', state.saved ? 'Este archivo no incluye una respuesta. Puedes leer sus fuentes o iniciar una nueva búsqueda.' : state.corpus ? 'Selecciona las fuentes y genera una respuesta para explorarla aquí.' : 'Primero busca una noticia y revisa sus coberturas.', 'empty-note')); return; }
-  if (!answerIsCurrent()) root.append(el('p', state.saved ? 'Respuesta anterior: el archivo conserva una pregunta o selección distinta de la usada para generarla. Esta vista es de solo lectura.' : 'Respuesta anterior: corresponde a otra pregunta o selección. Se conserva para que puedas leerla. Genera otra respuesta para aplicar tus cambios.', 'stale-note'));
-  const sheet = el('article', undefined, 'answer-sheet'); sheet.append(el('p', 'RESPUESTA DE IA · REFERENCIAS JUNTO A CADA AFIRMACIÓN', 'eyebrow'));
-  sheet.append(el('p', `Pregunta respondida: ${state.answer.question}`, 'answered-question'));
-  if (!state.answer.claims.length) sheet.append(el('p', 'Las fuentes seleccionadas no ofrecen evidencia suficiente para responder esta pregunta.', 'callout'));
-  for (const claim of state.answer.claims) sheet.append(observation(claim, { folded: true }));
-  sheet.append(el('p', 'Los fragmentos se comprobaron contra el texto leído. Revisa también si respaldan la interpretación de la IA.', 'small-note'));
+  } else if(state.answer) {
+    sheet.append(el('p','Respuesta conservada de una ejecución anterior.','small-note'));
+    for(const claim of state.answer.claims) sheet.append(observation(claim));
+  } else sheet.append(el('p','Este archivo conserva las fuentes, pero no incluye un resumen inicial.','notice'));
+  sheet.append(el('p','Síntesis de las fuentes encontradas. La selección de abajo se usa para proponer la pregunta.','small-note'));
   root.append(sheet);
-  const row = el('div', undefined, 'action-row'); row.append(el('p', 'Una síntesis siempre selecciona. Ahora podemos examinar esa selección.'));
-  const button = el('button', 'Examinar fuentes y omisiones →', 'primary'); button.addEventListener('click', () => { goTo('evidence'); }); row.append(button); root.append(row);
 }
-function appendSaveAction(root) {
-  const row = el('div', undefined, 'action-row save-result');
-  row.append(el('p', state.saved ? 'Este contenido ya procede de un archivo. Solo descarga si necesitas otra copia.' : '¿Quieres conservar el trabajo? Descarga una copia antes de cerrar. Puedes seguir revisando sin guardar.'));
-  const button = el('button', 'Descargar archivo', 'secondary'); button.disabled = state.busy;
-  button.dataset.download = 'true'; button.addEventListener('click', downloadArchive); row.append(button); root.append(row);
-}
-function renderEvidence() {
-  const root = $('evidence-content'); root.replaceChildren();
-  if (!state.answer) { root.append(el('p', state.saved ? 'Este archivo no incluye una respuesta ni un mapa de citas. Puedes revisar sus fuentes en el paso 1.' : 'Genera primero una respuesta. Aquí verás qué fuente respalda cada afirmación.', 'empty-note')); return; }
-  if (!answerIsCurrent()) root.append(el('p', state.saved ? 'Estas citas y omisiones corresponden a la respuesta anterior guardada en este archivo.' : 'Estas citas y omisiones corresponden a la respuesta anterior. Genera otra respuesta para aplicar la pregunta o selección actual.', 'stale-note'));
-  root.append(el('h3', 'Citas de la respuesta'), el('p', 'Cada fragmento procede del texto disponible del medio. Comprueba si respalda la afirmación de la IA.', 'section-note'));
-  const grid = el('div', undefined, 'evidence-map');
-  for (const a of state.corpus.articles) {
-    const card = el('article', undefined, 'evidence-card'); const h = el('h3'); h.append(safeLink(`${a.id.toUpperCase()} · ${a.medium}`, a.url)); card.append(h);
-    const claims = state.answer.claims.filter(c => c.evidence.some(e => e.sourceId === a.id));
-    const selected = state.answer.selectedIds.includes(a.id);
-    card.append(el('p', !selected ? 'No seleccionada: fuera del alcance de esta síntesis.' : claims.length ? `Citada en ${claims.length} afirmación${claims.length === 1 ? '' : 'es'}.` : 'Seleccionada, pero no citada en la respuesta.', 'small-note'));
-    for (const claim of claims) { card.append(el('p', claim.text)); for (const e of claim.evidence.filter(e => e.sourceId === a.id)) card.append(quoteBlock(e)); }
-    grid.append(card);
+function renderSources() {
+  const root=$('sources-content'); root.replaceChildren(); if(!state.corpus) return;
+  const readable=state.corpus.articles.filter(a=>a.access!=='unavailable' && a.text.length>=80);
+  const heading=el('div',undefined,'section-heading');
+  heading.append(el('h2','Las fuentes'),el('span',readable.length+' publicaciones · '+state.selected.size+' seleccionadas','small-note')); root.append(heading);
+  const grid=el('div',undefined,'sources-grid');
+  for(const a of readable) {
+    const card=el('article',undefined,'source-card'+(state.selected.has(a.id)?' selected':''));
+    const top=el('div',undefined,'source-top'); top.append(el('span',a.medium||new URL(a.url).hostname,'source-name'));
+    const label=el('label',undefined,'select-source'), box=el('input'); box.type='checkbox'; box.dataset.source=a.id; box.checked=state.selected.has(a.id);
+    box.setAttribute('aria-label','Seleccionar '+a.id.toUpperCase()+' · '+a.medium+' · '+a.title);
+    box.addEventListener('change',()=>{ box.checked?state.selected.add(a.id):state.selected.delete(a.id); state.dirty=true; renderSources(); renderQuestion(); controls(); document.querySelector('[data-source="'+a.id+'"]').focus(); });
+    label.append(box,document.createTextNode('Para la pregunta')); top.append(label);
+    const title=el('h3'); title.append(link(a.title,a.url));
+    card.append(top,title,el('p',a.date||'Fecha no disponible','metadata'));
+    if(a.access==='partial') card.append(el('p','Lectura parcial · '+a.accessNote,'metadata'));
+    const details=el('details'); details.append(el('summary','Leer texto de la fuente'),el('div',a.text,'read-text'));
+    card.append(details); grid.append(card);
   }
   root.append(grid);
-  if (!state.omissions) {
-    root.append(el('p', state.saved ? 'Esta ejecución guardada no incluye un análisis de omisiones. Se mantiene como respaldo sin nuevas llamadas.' : 'Pulsa “Analizar omisiones con IA” para contrastar la síntesis con los textos seleccionados. Esta acción realiza una llamada a la IA.', 'callout')); appendSaveAction(root); return;
+}
+function renderComparison() {
+  const root=$('comparison-content'); root.replaceChildren(); if(!state.corpus) return;
+  const section=el('section',undefined,'comparison');
+  section.append(el('p','LAS COBERTURAS, FRENTE A FRENTE','eyebrow'),el('h2','Dónde coinciden. Dónde difieren.'));
+  const grid=el('div',undefined,'comparison-columns');
+  for(const [key,title] of [['agreements','Coincidencias'],['differences','Diferencias']]) {
+    const column=el('div'); column.append(el('h3',title));
+    const topics=state.corpus.comparison[key]||[];
+    if(!topics.length) column.append(el('p','No se identificaron '+title.toLowerCase()+' con evidencia suficiente.','small-note'));
+    for(const t of topics) {
+      const card=el('article',undefined,'topic');
+      card.append(el('h4',t.topic||t.text));
+      for(const position of t.positions||[t]) {
+        const names=[...new Set(position.evidence.map(e=>source(e.sourceId)?.medium||e.sourceId))];
+        card.append(el('strong',names.join(' · '),'position-label'),observation(position));
+      }
+      column.append(card);
+    }
+    grid.append(column);
   }
-  root.append(el('span', 'GENERADO POR IA · INTERPRETACIÓN', 'content-label ai-label'));
-  const columns = el('div', undefined, 'omission-grid');
-  for (const [key, title] of [['omissions', 'Matices que no llegaron a la respuesta'], ['context', 'Contexto para seguir leyendo']]) {
-    const section = el('section'); section.append(el('h3', title)); observationList(section, state.omissions[key], 'No se identificaron observaciones con respaldo suficiente. Esto no prueba que la síntesis sea exhaustiva.'); columns.append(section);
-  }
-  root.append(columns, el('p', 'Este análisis cubre únicamente los textos disponibles de las fuentes seleccionadas. La identificación de omisiones es interpretativa y puede ser incompleta.', 'section-note')); appendSaveAction(root);
+  section.append(grid); root.append(section);
+}
+function renderQuestion() {
+  const root=$('question-materials'); root.replaceChildren(); if(!state.corpus) return;
+  const chips=el('div',undefined,'materials');
+  for(const id of state.selected) chips.append(el('span',source(id).medium,'material'));
+  if(state.corpus.overview) chips.append(el('span','+ Resumen inicial de IA','material derived'));
+  root.append(chips,el('p','El resumen es material derivado de todas las fuentes iniciales, incluidas las que desmarques. No cuenta como confirmación independiente.','small-note'));
+  const result=$('suggestion-content'); result.replaceChildren();
+  if(!state.suggestion) return;
+  if(!currentSuggestion()) result.append(el('p','Esta propuesta corresponde a la selección anterior. Puedes conservarla o proponer otra.','stale-note'));
+  const sheet=el('article',undefined,'suggested-question');
+  sheet.append(el('p','PREGUNTA PROPUESTA POR IA','eyebrow'));
+  const label=el('label','Edita la pregunta propuesta','sr-only'); label.htmlFor='suggested-question';
+  const input=el('textarea'); input.id='suggested-question'; input.rows=3; input.maxLength=1200; input.value=state.draftQuestion||state.suggestion.question; input.disabled=state.saved||state.busy;
+  input.addEventListener('input',()=>{ state.draftQuestion=input.value; state.dirty=true; });
+  sheet.append(label,input,el('p','Por qué encaja la propuesta original','small-note'));
+  for(const item of state.suggestion.rationale) sheet.append(observation(item));
+  result.append(sheet);
 }
 function render() {
-  renderCoverage(); renderAnswer(); renderEvidence(); controls();
-  $('new-run').hidden = !state.corpus; $('entry-panel').hidden = Boolean(state.corpus); document.body.classList.toggle('has-corpus', Boolean(state.corpus));
-  $('execution-label').textContent = state.corpus ? `${state.saved ? 'Archivo guardado' : 'Búsqueda actual'} · ${new Date(state.corpus.createdAt).toLocaleString('es-CL')}` : 'Sin búsqueda activa';
-  $('execution-label').classList.toggle('saved-banner', state.saved);
+  renderOverview(); renderSources(); renderComparison(); renderQuestion(); controls(); showView(state.view);
+  $('execution-label').textContent=state.corpus?(state.saved?'Ejecución guardada · ':'')+new Date(state.corpus.createdAt).toLocaleString('es-CL'):'';
+  $('execution-label').classList.toggle('saved-banner',state.saved);
 }
-async function api(action, body) {
-  if (state.busy || !state.enabled) return;
-  state.busy = true; controls(); showError(''); progress('Conectando con el servidor…');
+async function api(action,body) {
+  if(state.busy||!state.enabled) return null;
+  state.busy=true; controls(); error(''); progress('Conectando…');
   try {
-    const response = await fetch(`${state.base}/${action}`, { method: 'POST', headers: { Authorization: `Bearer ${state.access}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...body, requestId: crypto.randomUUID() }), signal: AbortSignal.timeout(420000) });
-    if (!response.ok) { const result = await response.json().catch(() => ({})); throw new Error(result.error || `El servidor devolvió HTTP ${response.status}.`); }
-    const reader = response.body.getReader(); const decoder = new TextDecoder(); let pending = ''; let result;
-    const consume = line => { if (!line.trim()) return; const event = JSON.parse(line);
-      if (event.type === 'progress') progress(event.message);
-      if (event.type === 'error') throw new Error(event.message);
-      if (event.type === 'result') result = event;
+    const response=await fetch(state.base+'/'+action,{method:'POST',headers:{Authorization:'Bearer '+state.access,'Content-Type':'application/json'},
+      body:JSON.stringify({...body,requestId:crypto.randomUUID()}),signal:AbortSignal.timeout(720000)});
+    if(!response.ok) { const data=await response.json().catch(()=>({})); throw new Error(data.error||'El servidor no pudo completar la operación.'); }
+    const reader=response.body.getReader(), decoder=new TextDecoder(); let pending='', result;
+    const consume=line=>{ if(!line.trim()) return; const event=JSON.parse(line);
+      if(event.type==='progress') progress(event.message);
+      if(event.type==='error') throw new Error(event.message);
+      if(event.type==='result') result=event;
     };
     try {
-      for (;;) { const { done, value } = await reader.read(); if (done) break;
-        pending += decoder.decode(value, { stream: true });
-        if (pending.length > 1500000) throw new Error('La respuesta supera el tamaño esperado.');
-        const lines = pending.split('\n'); pending = lines.pop(); for (const line of lines) consume(line);
+      for(;;) {
+        const {done,value}=await reader.read(); if(done) break;
+        pending+=decoder.decode(value,{stream:true}); if(pending.length>1500000) throw new Error('La respuesta supera el tamaño permitido.');
+        const lines=pending.split('\n'); pending=lines.pop(); for(const line of lines) consume(line);
       }
-      pending += decoder.decode(); consume(pending);
-    } finally { await reader.cancel().catch(() => {}); }
-    if (!result) throw new Error('La conexión terminó antes de entregar un resultado. No se reintentó.');
-    progress('Operación terminada. Revisa la evidencia antes de continuar.'); return result;
-  } catch (error) {
-    showError(error.name === 'TimeoutError' || error instanceof TypeError ? 'La conexión se interrumpió. No se reintentó; la operación podría haber consumido crédito. Revisa el servidor o abre un respaldo.' : error.message);
-    progress(''); return null;
-  } finally { state.busy = false; controls(); $('feedback').classList.remove('busy'); }
+      consume(pending+decoder.decode());
+    } finally { await reader.cancel().catch(()=>{}); }
+    if(!result) throw new Error('La conexión terminó sin resultado. No se reintentó.');
+    progress(''); return result;
+  } catch(e) { error(e.name==='TimeoutError'||e instanceof TypeError?'La conexión se interrumpió. No se reintentó; la operación puede haber consumido crédito.':e.message); progress(''); return null; }
+  finally { state.busy=false; controls(); }
 }
-$('search-form').addEventListener('submit', async e => {
-  e.preventDefault(); const input = $('news-input').value.trim();
-  if (input.length < 20) { showError('Pega una URL completa o un texto de al menos 20 caracteres.'); return; }
-  if (!(await confirmReplace())) return;
-  const result = await api('search', { input }); if (!result) return;
-  state.corpus = result.corpus; state.selected = new Set(result.corpus.articles.filter(a => a.access !== 'unavailable' && a.text.length >= 80).map(a => a.id));
-  state.answer = null; state.omissions = null; state.saved = false; state.dirty = true; state.downloaded = false; render(); goTo('coverage'); progress('Coberturas listas. Revisa las fuentes y continúa al paso 2.');
+function openConnection() { $('server-url').value=state.base; $('settings-message').textContent=''; controls(); $('settings').showModal(); }
+$('search-form').addEventListener('submit',async e=>{
+  e.preventDefault(); if(state.busy) return;
+  const input=$('news-input').value.trim(); if(input.length<5) return error('Escribe al menos cinco caracteres.');
+  if(!state.connected) { openConnection(); return; }
+  if(!state.enabled) return error('La IA está desactivada o no está disponible en el servidor.');
+  if(!(await confirmReplace())) return;
+  const data=await api('search',{input}); if(!data) return;
+  state.corpus=data.corpus; state.selected=new Set(data.corpus.articles.filter(a=>a.access!=='unavailable'&&a.text.length>=80).map(a=>a.id));
+  Object.assign(state,{suggestion:null,draftQuestion:'',answer:null,omissions:null,saved:false,dirty:true,view:'coverage'});
+  render(); showView('coverage',true);
 });
-$('generate').addEventListener('click', async () => {
-  if ($('generate').disabled) return;
-  const result = await api('generate', { corpus: state.corpus, selectedIds: [...state.selected], question: $('question').value.trim() });
-  if (!result) return;
-  state.answer = result.answer; state.omissions = null; markChanged(); renderAnswer(); renderEvidence(); controls();
-  progress('Respuesta generada. Revisa sus citas en el paso 3.'); $('answer-content').focus();
+$('news-input').addEventListener('input',controls);
+$('news-input').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); if(!$('search').disabled) $('search-form').requestSubmit(); } });
+$('suggest').addEventListener('click',async()=>{
+  if($('suggest').disabled) return;
+  const data=await api('suggest',{corpus:state.corpus,selectedIds:[...state.selected]}); if(!data) return;
+  state.suggestion=data.suggestion; state.draftQuestion=data.suggestion.question; state.dirty=true; renderQuestion(); controls(); $('suggestion-content').focus();
 });
-$('question').addEventListener('input', () => { markChanged(); renderAnswer(); renderEvidence(); controls(); });
-$('news-input').addEventListener('input', controls);
-$('find-omissions').addEventListener('click', async () => {
-  if ($('find-omissions').disabled) return;
-  const result = await api('omissions', { corpus: state.corpus, answer: state.answer });
-  if (!result) return; state.omissions = result.omissions; markChanged(); renderEvidence(); controls();
-  progress('Análisis de omisiones listo. Revisa los fragmentos antes de conservar el resultado.');
-  const resultNode = $('evidence-content').querySelector('.omission-grid'); resultNode.tabIndex = -1; resultNode.focus();
-});
-$('new-run').addEventListener('click', async () => {
-  if (!(await confirmReplace())) return;
-  Object.assign(state, { corpus: null, answer: null, omissions: null, selected: new Set(), saved: false, dirty: false, downloaded: false });
-  $('question').value = '¿Qué ocurrió y por qué importa?'; $('news-input').value = ''; showError(''); progress(''); render(); tab('coverage'); $('news-input').focus();
-});
-function downloadArchive() {
-  if (state.busy || !state.corpus) return;
-  // The previous answer keeps its own question and source IDs when the draft changes.
-  const data = { format: 'news-compass', version: 1, savedAt: new Date().toISOString(), corpus: state.corpus, answer: state.answer,
-    omissions: state.omissions, selectedIds: [...state.selected], question: $('question').value };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob);
-  const a = el('a'); a.href = url; a.download = `news-compass-${new Date().toISOString().replace(/[:.]/g, '-')}.json`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-  state.dirty = false; state.downloaded = true; controls();
-  progress('Descarga solicitada. Comprueba que el archivo JSON esté en tus descargas. Si cancelaste la descarga, pulsa “Descargar archivo” de nuevo.');
-}
-$('export').addEventListener('click', downloadArchive);
 function confirmReplace() {
-  if (!state.dirty) return Promise.resolve(true);
-  return new Promise(resolve => {
-    const dialog = $('replace-dialog'); dialog.returnValue = 'cancel';
-    $('replace-status').textContent = ''; $('replace-continue').textContent = 'Continuar sin descargar';
-    dialog.addEventListener('close', () => resolve(dialog.returnValue === 'continue'), { once: true });
-    dialog.showModal();
+  if(!state.corpus) return Promise.resolve(true);
+  return new Promise(resolve=>{
+    const d=$('replace-dialog'); d.returnValue='cancel'; $('replace-status').textContent='';
+    d.addEventListener('close',()=>resolve(d.returnValue==='continue'),{once:true}); d.showModal();
   });
 }
-$('replace-cancel').addEventListener('click', () => $('replace-dialog').close('cancel'));
-$('replace-continue').addEventListener('click', () => $('replace-dialog').close('continue'));
-$('replace-download').addEventListener('click', () => {
-  downloadArchive(); $('replace-status').textContent = 'Descarga solicitada. Comprueba el archivo antes de continuar.'; $('replace-continue').textContent = 'Ya tengo la copia: continuar';
-});
-window.addEventListener('beforeunload', e => { if (state.dirty || state.busy) { e.preventDefault(); e.returnValue = ''; } });
-$('import').addEventListener('click', () => $('import-file').click());
-$('import-file').addEventListener('change', async e => {
-  const input = e.currentTarget;
+async function newSearch() {
+  if(state.busy || !(await confirmReplace())) return;
+  Object.assign(state,{corpus:null,selected:new Set(),suggestion:null,draftQuestion:'',answer:null,omissions:null,saved:false,dirty:false,view:'coverage'});
+  $('news-input').value=''; error(''); progress(''); render(); $('news-input').focus();
+}
+$('home').addEventListener('click',newSearch); $('new-run').addEventListener('click',newSearch);
+$('replace-cancel').addEventListener('click',()=>$('replace-dialog').close('cancel'));
+$('replace-continue').addEventListener('click',()=>$('replace-dialog').close('continue'));
+$('replace-download').addEventListener('click',()=>{ download(); $('replace-status').textContent='Descarga solicitada. Comprueba el archivo antes de continuar.'; });
+$('show-coverage').addEventListener('click',()=>showView('coverage',true));
+$('show-question').addEventListener('click',()=>showView('question',true));
+$('continue').addEventListener('click',()=>showView('question',true));
+$('back').addEventListener('click',()=>showView('coverage',true));
+function download() {
+  if(!state.corpus||state.busy) return;
+  const data={format:'news-compass',version:2,savedAt:new Date().toISOString(),corpus:state.corpus,selectedIds:[...state.selected],
+    suggestion:state.suggestion,question:state.draftQuestion,answer:state.answer,omissions:state.omissions};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), url=URL.createObjectURL(blob), a=el('a');
+  a.href=url; a.download='news-compass-'+new Date().toISOString().replace(/[:.]/g,'-')+'.json'; a.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+  state.dirty=false; progress('Descarga solicitada. Comprueba el archivo en tus descargas.');
+}
+$('export').addEventListener('click',download);
+$('import').addEventListener('click',()=>$('import-file').click());
+$('import-file').addEventListener('change',async e=>{
+  const input=e.currentTarget;
   try {
-    const file = input.files[0]; if (!file) return;
-    if (file.size > 1500000) throw new Error('El archivo supera 1,5 MB.');
-    const data = validateArchive(JSON.parse(await file.text()));
-    if (!(await confirmReplace())) return;
-    Object.assign(state, { corpus: data.corpus, answer: data.answer ?? null, omissions: data.omissions ?? null,
-      selected: new Set(data.selectedIds ?? data.answer?.selectedIds ?? []), saved: true, dirty: false, downloaded: false });
-    $('question').value = data.question || data.answer?.question || '¿Qué ocurrió y por qué importa?';
-    $('news-input').value = data.corpus.input || ''; showError(''); progress('Archivo abierto en modo lectura. No se hicieron búsquedas ni llamadas a la IA.'); render(); goTo('coverage');
-  } catch (error) { showError(`No se pudo abrir el respaldo: ${error.message}`); }
-  finally { input.value = ''; }
+    const file=input.files[0]; if(!file) return;
+    if(file.size>1500000) throw new Error('El archivo supera 1,5 MB.');
+    const data=validateArchive(JSON.parse(await file.text()));
+    if(!(await confirmReplace())) return;
+    Object.assign(state,{corpus:data.corpus,selected:new Set(data.selectedIds??data.answer?.selectedIds??[]),
+      suggestion:data.suggestion??null,draftQuestion:data.question??data.suggestion?.question??'',answer:data.answer??null,omissions:data.omissions??null,
+      saved:true,dirty:false,view:'coverage'});
+    error(''); progress(''); render(); showView('coverage',true);
+  } catch(e) { error('No se pudo abrir el archivo: '+e.message); }
+  finally { input.value=''; }
 });
-$('configure').addEventListener('click', () => { $('server-url').value = state.base; $('settings-message').textContent = ''; $('settings').showModal(); });
-$('close-settings').addEventListener('click', () => $('settings').close());
-$('settings-form').addEventListener('submit', async e => {
-  e.preventDefault(); $('connect').disabled = true; $('settings-message').textContent = 'Comprobando conexión sin consumir API…';
+function validBase(value) {
+  const u=new URL(value);
+  if(u.protocol!=='https:' && !(u.protocol==='http:'&&['localhost','127.0.0.1'].includes(u.hostname))) throw new Error('El servidor debe usar HTTPS.');
+  if(u.username||u.password||u.search||u.hash||(u.pathname!=='/'&&u.pathname!=='')) throw new Error('Usa la dirección base del servidor.');
+  return u.origin;
+}
+async function checkConnection(base,access) {
+  const response=await fetch(base+'/status',{headers:{Authorization:'Bearer '+access},signal:AbortSignal.timeout(12000)});
+  const data=await response.json();
+  if(!response.ok) throw new Error(data.error||'No se pudo comprobar la conexión.');
+  return data;
+}
+$('configure').addEventListener('click',openConnection);
+$('close-settings').addEventListener('click',()=>$('settings').close());
+$('settings-form').addEventListener('submit',async e=>{
+  e.preventDefault(); if(state.connected||$('connect').disabled) return;
+  $('connect').disabled=true; $('settings-message').textContent='Comprobando conexión…';
   try {
-    const u = new URL($('server-url').value);
-    if (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(u.hostname))) throw new Error('El servidor debe usar HTTPS.');
-    if (u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) throw new Error('Usa la dirección base del servidor, sin ruta ni parámetros.');
-    const base = u.origin; const access = $('access-code').value;
-    const response = await fetch(`${base}/status`, { headers: { Authorization: `Bearer ${access}` }, signal: AbortSignal.timeout(12000) });
-    const data = await response.json(); if (!response.ok) throw new Error(data.error || 'No se pudo conectar.');
-    Object.assign(state, { base, access, connected: true, enabled: data.enabled === true });
-    $('access-code').value = ''; $('settings').close();
-    $('connection-status').textContent = state.enabled ? 'IA conectada' : 'IA desactivada'; $('connection-status').classList.toggle('ready', state.enabled);
-    $('configure').textContent = 'Conexión'; controls(); progress(state.enabled ? 'Conexión lista. Cada búsqueda o generación consume API. No se ha realizado ninguna llamada de pago al conectar.' : 'Servidor conectado. Las llamadas de pago están desactivadas; puedes abrir un respaldo.');
-  } catch (error) { $('settings-message').textContent = error instanceof TypeError ? 'No se pudo contactar al servidor. Revisa la dirección y el origen permitido.' : error.message; }
-  finally { $('connect').disabled = false; }
+    const base=validBase($('server-url').value),access=$('access-code').value;
+    const data=await checkConnection(base,access);
+    Object.assign(state,{base,access,connected:true,enabled:data.enabled===true}); persistConnection();
+    $('access-code').value=''; $('settings').close(); controls();
+    if(!state.enabled) error('Sesión conectada, pero la IA está desactivada en el servidor.'); else error('');
+  } catch(e) { $('settings-message').textContent=e.message; }
+  finally { $('connect').disabled=false; }
 });
-$('disconnect').addEventListener('click', () => { state.access = ''; state.enabled = false; state.connected = false; $('access-code').value = '';
-  $('connection-status').textContent = 'IA sin conectar'; $('connection-status').classList.remove('ready'); $('configure').textContent = 'Conectar'; controls(); $('settings').close(); progress('Conexión cerrada. La ejecución permanece en esta página.'); });
-$('projection').addEventListener('click', () => { const active = document.body.classList.toggle('projection'); $('projection').setAttribute('aria-pressed', String(active)); $('projection').textContent = active ? 'Salir de proyección' : 'Proyectar'; });
-render();
+$('disconnect').addEventListener('click',()=>{
+  Object.assign(state,{connected:false,enabled:false,access:''}); persistConnection(); $('access-code').value=''; $('settings').close(); controls();
+});
+window.addEventListener('beforeunload',e=>{ if(state.dirty||state.busy) { e.preventDefault(); e.returnValue=''; } });
+async function restoreConnection() {
+  try {
+    const saved=JSON.parse(sessionStorage.getItem(SESSION_KEY)||'null');
+    if(!saved||typeof saved.access!=='string'||saved.access.length<24) return;
+    const base=validBase(saved.base);
+    Object.assign(state,{base,access:saved.access,connected:true,enabled:false}); controls();
+    const data=await checkConnection(base,saved.access); state.enabled=data.enabled===true;
+  } catch { if(state.connected) error('Conservamos la sesión, pero no pudimos comprobar la IA. Revisa tu conexión o vuelve a cargar la página.'); }
+  finally { controls(); }
+}
+render(); restoreConnection();

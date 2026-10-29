@@ -8,7 +8,7 @@ const env = { AI_ENABLED: 'false', BUDGET_READY: 'false', ALLOWED_ORIGIN: 'http:
 http.createServer(async (request, response) => {
   try {
     const path = decodeURIComponent(new URL(request.url, 'http://127.0.0.1:' + port).pathname);
-    if (['/status', '/health', '/search', '/generate', '/omissions'].includes(path)) {
+    if (['/status', '/health', '/search', '/suggest', '/generate', '/omissions'].includes(path)) {
       const result = await worker.fetch(new Request('http://127.0.0.1:' + port + path, { method: request.method, headers: request.headers }), env);
       response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(await result.text()); return;
     }

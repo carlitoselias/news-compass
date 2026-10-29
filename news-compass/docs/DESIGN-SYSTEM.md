@@ -1,3 +1,11 @@
+# Diseño vigente: resumen y pregunta inversa
+
+La revisión del 29 de octubre sustituye el recorrido anterior descrito más abajo. Se mantiene la identidad editorial roja, Georgia en títulos y Arial en lectura. Portada mínima: logo, icono de conexión y barra central. Dos vistas: La noticia y La pregunta. La primera contiene resumen por aristas, tarjetas de fuentes y comparación por temas con posiciones atribuidas. La segunda presenta los materiales y una propuesta editable. Sin Proyectar ni categoría Contradicciones. Footer centrado: newscompass · 2026. Ver ADR-017 a ADR-021 para conducta y límites.
+
+Las fuentes usan dos columnas en escritorio y una en móvil. Los controles tienen foco visible, nombres accesibles y un tamaño de interacción mínimo de 44 px (las citas conservan formato compacto). Se usa el borde y la etiqueta, además del color, para distinguir el resumen derivado. Guardado en resultados y apertura mediante clip en la entrada. La conexión se indica con icono, estado accesible y punto de color.
+
+## Especificación anterior conservada como referencia
+
 # Sistema visual — Editorial rojo
 
 Fecha: 29 de octubre de 2026. Dirección elegida por Loreto: blanco, negro y rojo. Implementación publicada sobre la refactorización UX existente (46c37d7; Actions 40914007892). Fuente de verdad de los valores: `web/styles.css`.

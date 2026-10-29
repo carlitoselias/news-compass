@@ -12,7 +12,7 @@ owner = "personal"
 data_class = "public"
 workspace_policy = "split-code-data"
 remote_policy = "public-remote"
-first_outcome = "Loreto abre la web en GitHub Pages, introduce una noticia nueva, revisa y selecciona coberturas reales, genera una respuesta citada, examina omisiones y exporta o recupera una ejecucion guardada; un Worker protege el acceso a OpenAI."
+first_outcome = "Loreto abre la web, pregunta o pega una noticia, revisa el resumen citado, las fuentes y su comparacion; selecciona publicaciones y obtiene una pregunta propuesta usando esas fuentes y el resumen derivado; guarda o recupera la ejecucion. Un Worker protege OpenAI."
 acceptance = "Comprobaciones locales sin gasto; un ensayo API autorizado con noticia no precargada; evidencia trazable a fuentes seleccionadas; errores y accesos parciales visibles; respaldo recuperable; secretos ausentes del sitio; limites de consumo configurados antes de habilitar llamadas."
 
 [governance]

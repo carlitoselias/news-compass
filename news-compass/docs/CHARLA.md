@@ -1,31 +1,32 @@
-# Guion breve para Loreto
+# Guion para Loreto
 
-Fecha provisional: viernes 30 de octubre de 2026. Confirmar hora y conectividad del lugar.
+## Antes de la charla
 
-## Antes de salir
+- Abrir [News Compass](https://carlitoselias.github.io/news-compass/). Pulsar el icono superior e introducir el código de la demo.
+- Confirmar conexión, saldo disponible y límite API. No hacer búsquedas de calentamiento.
+- Tener un archivo del ensayo completo en el equipo y una copia independiente.
+- Probar la lectura a distancia con el navegador. El botón Proyectar se retiró.
+- Cerrar el diálogo de acceso antes de mostrar la pantalla al público.
 
-- Abrir la URL de GitHub Pages y conectar con el código de demo.
-- Tener el JSON del ensayo en el equipo de proyección y una copia independiente.
-- Confirmar el límite total API y el saldo. No hacer búsquedas automáticas de calentamiento.
-- Probar legibilidad con el botón Proyectar.
-- Mantener cerrada la configuración mientras el público ve la pantalla.
+## Recorrido
 
-## Recorrido sugerido
+1. Escribir una pregunta sobre una noticia, pegar un enlace o un texto.
+2. Leer el resumen de IA. Cada arista tiene sus citas: abrir una para comprobar el fragmento.
+3. Mostrar las publicaciones. El sistema descarta las que no puede leer y busca reemplazos. Si no alcanza cuatro, lo indica.
+4. Comparar los temas de Coincidencias y Diferencias. Cada posición nombra a sus fuentes.
+5. Seleccionar qué publicaciones se llevarán a «La pregunta».
+6. Pulsar «Proponer una pregunta». La IA usa esa selección y el resumen inicial como material derivado, sin contarlo como evidencia independiente.
+7. Leer y, si hace falta, editar la propuesta. Su explicación corresponde a la pregunta original de IA.
+8. Guardar la ejecución si se desea conservar. Usar «Nueva búsqueda» o el logo para otra consulta, sin desconectar.
 
-1. “Partamos de una noticia. ¿Qué otras coberturas encontramos?”
-2. Mostrar medio, fecha y acceso. Abrir un fragmento de cada voz distinta.
-3. Seleccionar fuentes. Explicar que artículos diferentes pueden depender del mismo despacho de agencia.
-4. Editar “¿Qué ocurrió y por qué importa?” y generar.
-5. Abrir una cita: “Podemos volver al texto que respalda esta afirmación.”
-6. Pulsar “¿Qué quedó fuera?” y mostrar un matiz ausente.
-7. Invitar al público a proponer otra noticia. Loreto la pega e inicia una nueva búsqueda.
+No presentar citas como certificado de verdad. Dos artículos pueden reproducir una misma fuente y no constituir confirmaciones independientes.
 
-No presentar citas como certificado de verdad, ni omisiones como prueba automática de sesgo.
+## Respaldo
 
-## Si falla la conexión o una fuente
+En la barra de entrada, el icono de clip abre el JSON. Se muestra «Ejecución guardada» y no se hacen llamadas a IA. No presentar un archivo como una respuesta recién generada.
 
-Mostrar el error con naturalidad. Si una publicación no puede leerse, señalar esa limitación. Si no se puede continuar en vivo, abrir el JSON guardado: la pantalla mostrará “Ejecución guardada”. No presentarlo como una respuesta recién generada.
+El código de acceso se guarda por pestaña y sobrevive a una recarga. El trabajo no se guarda automáticamente: descargarlo antes de recargar o cerrar. Desconectar elimina el código de la sesión, aunque el navegador permita restaurar pestañas.
 
 ## Al terminar
 
-Guardar las ejecuciones que se quieran conservar de forma privada. Desactivar la IA del servidor. No dejar una web pública con gasto abierto.
+Guardar los resultados necesarios. Desconectar la interfaz y desactivar la IA del servidor cuando no se vaya a usar. Desconectar el navegador no apaga el Worker.

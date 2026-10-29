@@ -29,11 +29,13 @@ export function extractArticle(html, url) {
   for (const el of document.querySelectorAll('script,style,noscript,iframe,svg,form,button,nav,footer')) el.remove();
   const article = new Readability(document, { charThreshold: 250 }).parse();
   const extracted = normalize(article?.textContent);
-  const usable = extracted.length >= 250 && !paywall;
+  const template = /\{\{[^}]+\}\}/.test(extracted) || (extracted.match(/Alerta de Spoiler|Advertencia de imágenes explícitas|Estamos recopilando más antecedentes|Este artículo describe un proceso judicial/gi) ?? []).length >= 2;
+  const challenge = /^(just a moment|access denied|verify you are human|checking your browser)/i.test(extracted);
+  const usable = extracted.length >= 250 && !paywall && !template && !challenge;
   // We never claim the entire original was accessible: this is the extracted text only.
   const text = (usable ? extracted : description).slice(0, 12000);
-  return { title, date, medium, text, access: usable && extracted.length <= 12000 ? 'read' : text.length >= 80 ? 'partial' : 'unavailable',
-    accessNote: paywall ? 'Se detectó acceso restringido. Solo se conserva la descripción pública.' :
+  return { title, date, medium, text, textOrigin: usable ? 'body' : 'description', access: usable && extracted.length <= 12000 ? 'read' : text.length >= 80 ? 'partial' : 'unavailable',
+    accessNote: template || challenge ? 'La página entregó una plantilla o bloqueo, no el cuerpo de la noticia.' : paywall ? 'Se detectó acceso restringido. Solo se conserva la descripción pública.' :
       usable ? (extracted.length > 12000 ? 'Texto recortado a 12.000 caracteres.' : 'Texto extraído; revisa su alcance en el original.') :
         'Solo se obtuvo la descripción pública, o no hubo texto suficiente.',
     retrievedAt: new Date().toISOString() };

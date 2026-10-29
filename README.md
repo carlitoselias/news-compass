@@ -1,9 +1,7 @@
 # News Compass
 
-Demo en español: noticia → coberturas → respuesta citada → fuentes y omisiones.
+Demo en español: pregunta, enlace o texto → resumen citado → fuentes → comparación → pregunta propuesta.
 
-[Documentación y código de la aplicación](news-compass/README.md)
+[Web pública](https://carlitoselias.github.io/news-compass/) · [Documentación](news-compass/README.md)
 
-Interfaz: https://carlitoselias.github.io/news-compass/
-
-Las llamadas de pago están desactivadas. La prueba real requiere configurar secretos, comprobar el presupuesto y autorizar el ensayo.
+El estado de la IA y el presupuesto se controlan en el servidor. Las pruebas locales no consumen OpenAI.

@@ -35,8 +35,14 @@ export function selectedArticles(corpus, ids) {
     return article;
   });
 }
+export function summarySource(corpus) {
+  if (!corpus.overview?.sections?.length) return null;
+  return { id: 'ai-summary', title: 'Resumen inicial de IA', medium: 'IA · contenido derivado',
+    text: corpus.overview.sections.map(s => s.heading + '\n' + s.claims.map(c => c.text).join('\n')).join('\n\n'),
+    access: 'read' };
+}
 export function validateArchive(data) {
-  if (data?.format !== 'news-compass' || data.version !== 1 || !data.corpus || !Array.isArray(data.corpus.articles))
+  if (data?.format !== 'news-compass' || ![1, 2].includes(data.version) || !data.corpus || !Array.isArray(data.corpus.articles))
     throw new Error('Este archivo no es una ejecución de News Compass compatible.');
   const c = data.corpus;
   if (!Number.isFinite(Date.parse(c.createdAt)) || typeof c.input !== 'string' || c.input.length > 16000 || !c.comparison || typeof c.comparison !== 'object') throw new Error('La ejecución no contiene fecha, entrada o comparación válidas.');
@@ -50,7 +56,29 @@ export function validateArchive(data) {
       !['read', 'partial', 'unavailable'].includes(a.access)) throw new Error('Una fuente guardada no es válida.');
     if (a.analysis) for (const key of ['facts', 'voices', 'context', 'focus', 'agency']) validateEvidence(a.analysis[key], [a]);
   }
-  for (const key of ['agreements', 'differences', 'contradictions']) validateEvidence(c.comparison?.[key] ?? [], c.articles);
+  for (const key of ['agreements', 'differences', 'contradictions']) {
+    const items = c.comparison?.[key] ?? [];
+    if (!Array.isArray(items) || items.length > 24) throw new Error('Comparación no válida.');
+    for (const item of items) {
+      if (item.positions) {
+        if (typeof item.topic !== 'string' || !item.topic.trim()) throw new Error('Falta el tema de comparación.');
+        validateEvidence(item.positions, c.articles);
+      } else validateEvidence([item], c.articles);
+    }
+  }
+  if (c.overview) {
+    if (!Array.isArray(c.overview.sections) || !c.overview.sections.length || c.overview.sections.length > 6) throw new Error('Resumen no válido.');
+    for (const section of c.overview.sections) {
+      if (typeof section.heading !== 'string' || !section.heading.trim()) throw new Error('Falta una arista del resumen.');
+      if (!section.claims?.length) throw new Error('Resumen sin evidencia.');
+      validateEvidence(section.claims, c.articles, { max: 4 });
+    }
+  }
+  if (data.suggestion) {
+    const sources = selectedArticles(c, data.suggestion.selectedIds), summary = summarySource(c);
+    if (!summary || data.suggestion.corpusId !== c.id || typeof data.suggestion.question !== 'string' || !data.suggestion.question.trim() || data.suggestion.question.length > 1200) throw new Error('Propuesta de pregunta no válida.');
+    validateEvidence(data.suggestion.rationale, [...sources, summary], { max: 3 });
+  }
   if (data.question !== undefined && (typeof data.question !== 'string' || data.question.length > 1200)) throw new Error('La pregunta guardada no es válida.');
   if (data.selectedIds !== undefined) {
     if (!Array.isArray(data.selectedIds)) throw new Error('La selección guardada no es válida.');

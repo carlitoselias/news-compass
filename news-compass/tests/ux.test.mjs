@@ -3,175 +3,103 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { parseHTML } from 'linkedom';
-import { publicURL, validateArchive } from '../shared/evidence.mjs';
-import { corpus, item } from './fixtures.mjs';
-const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
-const script = (await readFile(new URL('../web/app.mjs', import.meta.url), 'utf8')).replace(/^import .*;\r?\n/gm, '');
-const tick = () => new Promise(resolve => setImmediate(resolve));
-function setup() {
-  const { document, window } = parseHTML(html);
-  window.HTMLElement.prototype.scrollIntoView = function () {};
-  for (const dialog of document.querySelectorAll('dialog')) {
-    dialog.showModal = () => { dialog.open = true; };
-    dialog.close = value => { dialog.open = false; dialog.returnValue = value; dialog.dispatchEvent(new window.Event('close')); };
-  }
-  const blobs = []; const calls = [];
-  class TestURL extends URL {
-    static createObjectURL(blob) { blobs.push(blob); return 'blob:test'; }
-    static revokeObjectURL() {}
-  }
-  const context = vm.createContext({ document, window, URL: TestURL, Blob, Set, Date, publicURL, validateArchive,
-    DEFAULT_API_BASE: '', setTimeout: () => {}, TextDecoder, AbortSignal, crypto,
-    fetch: async (...args) => { calls.push(args); throw new Error('Fallo de prueba'); } });
-  vm.runInContext(script, context);
-  const run = code => vm.runInContext(code, context);
-  const $ = id => document.getElementById(id);
-  const change = id => $(id).dispatchEvent(new window.Event('input'));
-  const load = () => {
-    context.fixture = { corpus: corpus(), answer: { question: '¿Qué ocurrió?', selectedIds: ['s1'], claims: [item()] }, omissions: { omissions: [], context: [] } };
-    run("Object.assign(state, fixture, {selected:new Set(['s1']), connected:true, enabled:true}); $('question').value='¿Qué ocurrió?'; render();");
-  };
-  return { document, window, context, calls, blobs, run, $, change, load };
+import { publicURL, validateArchive, summarySource } from '../shared/evidence.mjs';
+import { corpus, article, item } from './fixtures.mjs';
+const html=await readFile(new URL('../web/index.html',import.meta.url),'utf8');
+const script=(await readFile(new URL('../web/app.mjs',import.meta.url),'utf8')).replace(/^import .*;\r?\n/gm,'');
+const tick=()=>new Promise(r=>setImmediate(r));
+function fixture() {
+  const c=corpus(); c.articles.push(article('s3'),article('s4'));
+  c.overview={sections:[{heading:'Apertura',claims:[item()]}]};
+  c.comparison={agreements:[{topic:'Fecha de apertura',positions:[{text:'Ambos anuncian el viernes.',evidence:[item().evidence[0],item('s2').evidence[0]]}]}],differences:[]};
+  return c;
 }
-
-test('initial guide explains connection and all locked actions', () => {
-  const ui = setup();
-  assert.equal(ui.$('search').disabled, true);
-  assert.match(ui.$('input-hint').textContent, /Conectar IA/);
-  assert.match(ui.$('generate-help').textContent, /Primero/);
-  assert.match(ui.$('save-status').textContent, /Sin guardado automático/);
-  ui.$('next-action').click(); assert.equal(ui.$('settings').open, true);
+function setup(store=new Map()) {
+  const {document,window}=parseHTML(html);
+  window.HTMLElement.prototype.scrollIntoView=function(){};
+  for(const d of document.querySelectorAll('dialog')) { d.showModal=()=>{d.open=true;}; d.close=v=>{d.open=false;d.returnValue=v;d.dispatchEvent(new window.Event('close'));}; }
+  const calls=[],blobs=[];
+  class TestURL extends URL { static createObjectURL(b){blobs.push(b);return 'blob:test';} static revokeObjectURL(){} }
+  const sessionStorage={getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v),removeItem:k=>store.delete(k)};
+  const context=vm.createContext({document,window,URL:TestURL,Blob,Set,Date,publicURL,validateArchive,summarySource,sessionStorage,
+    DEFAULT_API_BASE:'http://127.0.0.1:4174',setTimeout:()=>{},TextDecoder,AbortSignal,crypto,
+    fetch:async(...args)=>{calls.push(args); if(args[0].endsWith('/status')) return Response.json({enabled:true}); throw new Error('Fallo de prueba');}});
+  vm.runInContext(script,context);
+  const run=code=>vm.runInContext(code,context), $=id=>document.getElementById(id);
+  const load=()=>{context.fixture=fixture();run("Object.assign(state,{corpus:fixture,selected:new Set(['s1','s2','s3','s4']),connected:true,enabled:true,access:'test-access-code-with-32-characters',dirty:true}); render();");};
+  return {document,window,context,calls,blobs,store,run,$,load};
+}
+test('minimal entry supports short questions and opens login without losing input',()=>{
+  const ui=setup();assert.equal(ui.$('workspace').hidden,true);assert.equal(ui.$('search').disabled,true);
+  ui.$('news-input').value='qué pasó con Bolsonaro';ui.$('news-input').dispatchEvent(new ui.window.Event('input'));
+  assert.equal(ui.$('search').disabled,false);
+  ui.$('search-form').dispatchEvent(new ui.window.Event('submit',{cancelable:true}));
+  assert.equal(ui.$('settings').open,true);assert.equal(ui.$('news-input').value,'qué pasó con Bolsonaro');
+  assert.equal(ui.document.querySelector('#projection'),null);assert.equal(ui.document.querySelector('footer').textContent,'newscompass · 2026');
 });
-
-test('editing the question preserves the old answer and prevents mismatched omissions', () => {
-  const ui = setup(); ui.load();
-  ui.$('question').value = '¿Quién participa?'; ui.change('question');
-  assert.equal(ui.run('state.answer.claims.length'), 1);
-  assert.equal(ui.run('state.dirty'), true);
-  assert.equal(ui.$('find-omissions').disabled, true);
-  assert.match(ui.$('answer-content').textContent, /Respuesta anterior/);
-  assert.match(ui.$('answer-content').textContent, /Pregunta respondida: ¿Qué ocurrió\?/);
-  ui.$('question').value = '¿Qué ocurrió?'; ui.change('question');
-  assert.equal(ui.run('answerIsCurrent()'), true);
-  assert.equal(ui.document.querySelector('.stale-note'), null);
+test('logo and new search reset only the work; cancellation preserves everything',async()=>{
+  const ui=setup();ui.load();ui.$('home').click();ui.$('replace-cancel').click();await tick();
+  assert.ok(ui.run('state.corpus'));assert.equal(ui.run('state.connected'),true);
+  ui.$('home').click();ui.$('replace-continue').click();await tick();
+  assert.equal(ui.run('state.corpus'),null);assert.equal(ui.run('state.connected'),true);assert.match(ui.run('state.access'),/^test-access/);assert.equal(ui.$('news-input').value,'');
+  ui.load();ui.$('new-run').click();ui.$('replace-continue').click();await tick();assert.equal(ui.run('state.enabled'),true);
 });
-
-test('source changes preserve results and mark them as previous', () => {
-  const ui = setup(); ui.load();
-  const box = ui.document.querySelector('[data-source="s1"]'); box.checked = false; box.dispatchEvent(new ui.window.Event('change'));
-  assert.equal(ui.run('state.selected.size'), 0);
-  assert.equal(ui.run('state.answer.claims.length'), 1);
-  assert.equal(ui.$('generate').disabled, true);
-  assert.match(ui.$('generate-help').textContent, /al menos una/);
-  assert.match(ui.$('next-title').textContent, /al menos una/);
+test('connection dialog shows only disconnect when authenticated; only disconnect removes credentials',()=>{
+  const ui=setup();ui.load();ui.run('persistConnection()');ui.$('configure').click();
+  assert.equal(ui.$('settings-form').hidden,true);assert.equal(ui.$('connected-panel').hidden,false);
+  ui.$('disconnect').click();assert.equal(ui.run('state.connected'),false);assert.equal(ui.store.size,0);assert.ok(ui.run('state.corpus'));
 });
-
-test('citation opens its exact local evidence and makes zero requests', () => {
-  const ui = setup(); ui.load();
-  const details = ui.$('answer-content').querySelector('details');
-  ui.$('answer-content').querySelector('.inline-citation').click();
-  assert.equal(details.open, true);
-  assert.match(details.textContent, /Cita del medio · fragmento literal/);
-  assert.equal(ui.calls.length, 0);
+test('tab session survives reload and is rechecked without a paid request',async()=>{
+  const ui=setup();ui.load();ui.run('persistConnection()');const next=setup(ui.store);await tick();
+  assert.equal(next.run('state.connected'),true);assert.equal(next.run('state.enabled'),true);assert.equal(next.calls.length,1);assert.match(next.calls[0][0],/\/status$/);
 });
-
-test('cancel replacement keeps work; download retains draft and original answer separately', async () => {
-  const ui = setup(); ui.load();
-  ui.$('question').value = 'Una pregunta nueva'; ui.change('question');
-  ui.$('new-run').click(); assert.equal(ui.$('replace-dialog').open, true);
-  ui.$('replace-cancel').click(); await tick();
-  assert.ok(ui.run('state.corpus'));
-  ui.$('export').click();
-  const data = JSON.parse(await ui.blobs[0].text()); validateArchive(data);
-  assert.equal(data.question, 'Una pregunta nueva'); assert.equal(data.answer.question, '¿Qué ocurrió?');
-  assert.equal(data.access, undefined); assert.equal(data.base, undefined);
-  assert.match(ui.$('save-status').textContent, /Descarga solicitada/);
-  assert.equal(ui.run('state.dirty'), false);
-  ui.$('question').value = 'Otra pregunta nueva'; ui.change('question');
-  assert.equal(ui.$('export').textContent, 'Descargar versión actual');
-  ui.$('new-run').click(); ui.$('replace-continue').click(); await tick();
-  assert.equal(ui.run('state.corpus'), null);
+test('summary precedes source cards and comparisons name topic and publications',()=>{
+  const ui=setup();ui.load();
+  assert.match(ui.$('overview-content').textContent,/Apertura/);assert.match(ui.$('comparison-content').textContent,/Fecha de apertura/);
+  assert.match(ui.$('comparison-content').textContent,/Medio de prueba s1 · Medio de prueba s2/);
+  assert.doesNotMatch(ui.$('comparison-content').textContent,/Contradicciones/);
+  const boxes=[...ui.document.querySelectorAll('[data-source]')];assert.equal(new Set(boxes.map(b=>b.getAttribute('aria-label'))).size,4);
 });
-
-test('failed generation preserves the old answer and re-enables controls without retries', async () => {
-  const ui = setup(); ui.load();
-  ui.$('generate').click(); await tick();
-  assert.equal(ui.calls.length, 1);
-  assert.equal(ui.run('state.answer.claims.length'), 1);
-  assert.equal(ui.$('generate').disabled, false);
-  assert.match(ui.$('error').textContent, /Fallo de prueba/);
+test('citations expand exact evidence locally without requests',()=>{
+  const ui=setup();ui.load();ui.$('overview-content').querySelector('.citation').click();
+  assert.equal(ui.$('overview-content').querySelector('details').open,true);assert.equal(ui.calls.length,0);
 });
-
-test('busy state prevents duplicate requests and warns before closing', async () => {
-  const ui = setup(); ui.load();
-  ui.run('state.busy = true; controls();');
-  assert.equal(ui.$('next-action').disabled, true);
-  assert.equal(ui.$('generate').disabled, true);
-  assert.equal(ui.$('import').disabled, true);
-  await ui.run("api('generate', {})"); assert.equal(ui.calls.length, 0);
-  const event = new ui.window.Event('beforeunload', { cancelable: true }); ui.window.dispatchEvent(event);
-  assert.equal(event.defaultPrevented, true);
+test('question view distinguishes derived summary and preserves old proposal after source change',()=>{
+  const ui=setup();ui.load();ui.context.proposal={corpusId:'test-corpus',selectedIds:['s1','s2','s3','s4'],question:'¿Cuándo abrirá?',rationale:[item()]};
+  ui.run("state.suggestion=proposal; state.draftQuestion=proposal.question; render();");
+  ui.$('continue').click();assert.equal(ui.$('question-screen').hidden,false);assert.match(ui.$('question-materials').textContent,/No cuenta como confirmación independiente/);
+  const box=ui.document.querySelector('[data-source]');box.checked=false;box.dispatchEvent(new ui.window.Event('change'));
+  assert.match(ui.$('suggestion-content').textContent,/selección anterior/);assert.equal(ui.run('state.suggestion.question'),'¿Cuándo abrirá?');
 });
-
-test('read-only archive states explain missing results and never enable AI actions', () => {
-  const ui = setup(); ui.load(); ui.run('state.saved = true; state.omissions = null; render();');
-  assert.equal(ui.$('generate').disabled, true); assert.equal(ui.$('find-omissions').disabled, true);
-  assert.match(ui.$('generate-help').textContent, /modo lectura/);
-  assert.match(ui.$('omissions-help').textContent, /no incluye omisiones/);
-  assert.equal(ui.document.querySelector('[data-source]').disabled, true);
-  assert.match(ui.$('save-status').textContent, /solo lectura/);
+test('failed suggestion keeps results and does not retry',async()=>{
+  const ui=setup();ui.load();ui.$('suggest').click();await tick();
+  assert.equal(ui.calls.length,1);assert.ok(ui.run('state.corpus.overview'));assert.match(ui.$('error').textContent,/Fallo de prueba/);
+  assert.equal(ui.$('suggest').disabled,false);
 });
-
-test('invalid imports preserve the current corpus', async () => {
-  const ui = setup(); ui.load();
-  const file = ui.$('import-file'); file.files = [{ size: 20, text: async () => '{"format":"wrong"}' }];
-  file.dispatchEvent(new ui.window.Event('change')); await tick();
-  assert.equal(ui.run('state.corpus.id'), 'test-corpus');
-  assert.match(ui.$('error').textContent, /No se pudo abrir/);
+test('busy state prevents duplicate requests and warns before closing',async()=>{
+  const ui=setup();ui.load();ui.run('state.busy=true;controls()');
+  assert.equal(ui.$('home').disabled,true);assert.equal(ui.$('new-run').disabled,true);assert.equal(ui.$('suggest').disabled,true);
+  await ui.run("api('suggest',{})");assert.equal(ui.calls.length,0);
+  const event=new ui.window.Event('beforeunload',{cancelable:true});ui.window.dispatchEvent(event);assert.equal(event.defaultPrevented,true);
 });
-
-test('draft archive validation rejects non-text questions and unavailable draft selections', () => {
-  const data = { format: 'news-compass', version: 1, corpus: corpus(), question: 2 };
-  assert.throws(() => validateArchive(data)); data.question = 'Pregunta'; data.selectedIds = ['s9'];
-  assert.throws(() => validateArchive(data)); data.selectedIds = [];
-  assert.equal(validateArchive(data), data);
+test('new archives preserve overview, proposal, edited question and selection without secrets',async()=>{
+  const ui=setup();ui.load();ui.context.proposal={corpusId:'test-corpus',selectedIds:['s1'],question:'¿Cuándo abre?',rationale:[item()]};
+  ui.run("state.suggestion=proposal;state.draftQuestion='¿Cuándo abre y para quién?';render()");ui.$('export').click();
+  const text=await ui.blobs[0].text(),data=JSON.parse(text);validateArchive(data);
+  assert.ok(data.corpus.overview);assert.equal(data.question,'¿Cuándo abre y para quién?');assert.equal(data.suggestion.question,'¿Cuándo abre?');
+  assert.ok(!text.includes('test-access'));assert.equal(data.base,undefined);
+  const restored=setup();restored.$('import-file').files=[{size:text.length,text:async()=>text}];
+  restored.$('import-file').dispatchEvent(new restored.window.Event('change'));await tick();
+  assert.match(restored.$('execution-label').textContent,/Ejecución guardada/);assert.equal(restored.$('suggest').disabled,true);
+  assert.equal(restored.$('suggested-question').value,data.question);assert.equal(restored.calls.length,0);
 });
-
-test('keyboard navigation updates active tab and its tab stop', () => {
-  const ui = setup();
-  const event = new ui.window.Event('keydown', { cancelable: true }); event.key = 'ArrowRight'; ui.$('tab-coverage').dispatchEvent(event);
-  assert.equal(ui.$('tab-response').getAttribute('aria-selected'), 'true');
-  assert.equal(ui.$('response').hidden, false); assert.equal(ui.$('coverage').hidden, true);
-  assert.equal(ui.$('tab-coverage').getAttribute('tabindex'), '-1');
+test('invalid archive cannot replace current work',async()=>{
+  const ui=setup();ui.load();ui.$('import-file').files=[{size:10,text:async()=>'{}'}];
+  ui.$('import-file').dispatchEvent(new ui.window.Event('change'));await tick();assert.equal(ui.run('state.corpus.id'),'test-corpus');assert.match(ui.$('error').textContent,/No se pudo abrir/);
 });
-test('a partial archive explains absence of a response and offers a new search', () => {
-  const ui = setup(); ui.load(); ui.run('state.saved = true; state.answer = null; state.omissions = null; render();');
-  assert.match(ui.$('next-title').textContent, /solo coberturas/);
-  assert.equal(ui.$('next-action').textContent, 'Nueva búsqueda');
-  assert.match(ui.$('answer-content').textContent, /no incluye una respuesta/);
-  assert.match(ui.$('omissions-help').textContent, /no contiene una respuesta/);
-});
-
-test('archive round trip preserves an edited draft alongside its previous answer', async () => {
-  const ui = setup(); ui.load(); ui.$('question').value = 'Nueva pregunta sin generar'; ui.change('question'); ui.$('export').click();
-  const saved = await ui.blobs[0].text();
-  const restored = setup(); const input = restored.$('import-file'); input.files = [{size:saved.length, text:async()=>saved}];
-  input.dispatchEvent(new restored.window.Event('change')); await tick();
-  assert.equal(restored.$('question').value, 'Nueva pregunta sin generar');
-  assert.match(restored.$('answer-content').textContent, /Pregunta respondida: ¿Qué ocurrió\?/);
-  assert.match(restored.$('answer-content').textContent, /Respuesta anterior/);
-  assert.equal(restored.$('generate').disabled, true);
-  assert.equal(restored.calls.length, 0);
-});
-
-test('source controls distinguish publications with identical headlines', () => {
-  const ui = setup(); ui.load();
-  const boxes = [...ui.document.querySelectorAll('[data-source]')];
-  const names = boxes.map(box => box.getAttribute('aria-label'));
-  assert.equal(new Set(names).size, boxes.length);
-  for (const box of boxes) {
-    const source = ui.run('state.corpus.articles').find(article => article.id === box.dataset.source);
-    assert.ok(box.getAttribute('aria-label').includes(source.id.toUpperCase()));
-    assert.ok(box.getAttribute('aria-label').includes(source.medium));
-  }
+test('legacy v1 archive can be viewed and exported without losing its answer or omissions',async()=>{
+  const ui=setup();const old={format:'news-compass',version:1,corpus:corpus(),selectedIds:['s1'],answer:{selectedIds:['s1'],claims:[item()]},omissions:{omissions:[],context:[]}};
+  const text=JSON.stringify(old);ui.$('import-file').files=[{size:text.length,text:async()=>text}];
+  ui.$('import-file').dispatchEvent(new ui.window.Event('change'));await tick();assert.match(ui.$('overview-content').textContent,/Respuesta conservada/);
+  ui.$('export').click();const data=JSON.parse(await ui.blobs[0].text());assert.deepEqual(data.answer,old.answer);assert.deepEqual(data.omissions,old.omissions);assert.equal(ui.$('suggest').disabled,true);
 });

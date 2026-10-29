@@ -17,13 +17,13 @@ export default {
     if (origin && !permitted) return json({ error: 'Origen no autorizado.' }, 403, headers);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
     const path = new URL(request.url).pathname;
-    if (path === '/health' && request.method === 'GET') return json({ service: 'news-compass', version: 1 }, 200, headers);
+    if (path === '/health' && request.method === 'GET') return json({ service: 'news-compass', version: 2, features: ['overview', 'source-replacement', 'suggest'] }, 200, headers);
     if (!await authorized(request.headers.get('Authorization'), env.DEMO_ACCESS_TOKEN)) return json({ error: 'Código de acceso incorrecto o servidor sin configurar.' }, 401, headers);
     if (path === '/status' && request.method === 'GET') return json({
       enabled: env.AI_ENABLED === 'true' && env.BUDGET_READY === 'true' && Boolean(env.OPENAI_API_KEY && env.OPENAI_MODEL),
       model: env.OPENAI_MODEL ?? '', message: env.AI_ENABLED === 'true' && env.BUDGET_READY === 'true' ? 'Comprueba el saldo y el límite en el panel de OpenAI.' : 'Llamadas de pago desactivadas.'
     }, 200, headers);
-    if (request.method !== 'POST' || !['/search', '/generate', '/omissions'].includes(path)) return json({ error: 'Ruta no disponible.' }, 404, headers);
+    if (request.method !== 'POST' || !['/search', '/suggest', '/generate', '/omissions'].includes(path)) return json({ error: 'Ruta no disponible.' }, 404, headers);
     if (env.AI_ENABLED !== 'true' || env.BUDGET_READY !== 'true') return json({ error: 'Las llamadas de pago están desactivadas. Puedes recuperar una ejecución guardada.' }, 403, headers);
     try {
       if (!request.headers.get('content-type')?.includes('application/json')) throw new UserError('Se requiere JSON.');
@@ -47,7 +47,7 @@ export class DemoGate {
       if (state.day !== day) Object.assign(state, { day, count: 0, ids: [] });
       if (state.ids.includes(payload.requestId)) return { error: 'Esta solicitud ya se procesó. No se volverá a cobrar automáticamente.', status: 409 };
       if (state.count >= 60) return { error: 'Se alcanzó el máximo de 60 operaciones del día. Consulta el respaldo.', status: 429 };
-      state.count++; state.ids.push(payload.requestId); state.activeUntil = Date.now() + 420000;
+      state.count++; state.ids.push(payload.requestId); state.activeUntil = Date.now() + 720000;
       state.activeId = payload.requestId;
       await this.ctx.storage.put('gate', state); return null;
     });

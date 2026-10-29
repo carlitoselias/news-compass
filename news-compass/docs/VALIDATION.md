@@ -69,3 +69,29 @@ La usuaria autorizó pasar los cambios a main y usar la versión pública. Commi
 Web verificada: https://carlitoselias.github.io/news-compass/. El navegador confirma el acento #C51F30, Georgia en titulares, los controles de la nueva UX, navegación con flecha derecha y Home, y el modo Proyectar. Ancho efectivo de 373 px sin desbordamiento horizontal. Consola sin errores ni advertencias observados. El diálogo incluye la URL pública del Worker. No se introdujeron credenciales ni se hicieron llamadas de pago para esta comprobación. La publicación no modifica el Worker ni su configuración privada.
 
 Se conservan como pendientes la prueba física de proyección y la revisión de claridad con la usuaria. La nueva web puede usarse directamente sin el servidor local.
+
+## Ensayo real y cierre de continuidad — 29 de octubre de 2026
+
+Este registro actualiza el estado previo al ensayo. Las afirmaciones anteriores sobre ausencia de llamadas API corresponden a sus respectivas fases de desarrollo y publicación.
+
+- Verificado: el archivo privado output/ensayo-aluvion-las-condes-busqueda-2026-10-29.run.json conserva cinco artículos y dos recibos reales de Responses. Corpus creado a las 12:13:25 de Santiago. Acontecimiento: aluvión de San Carlos de Apoquindo del 8 de octubre de 2026.
+- El archivo tiene 47.483 bytes, incluye las cinco fuentes seleccionadas y no contiene respuesta ni omisiones. Es respaldo de búsqueda, no del recorrido completo.
+- Reportado por la usuaria: los botones de respuesta y omisiones funcionaron cuando continuó en su navegador. No se inspeccionó ese resultado completo ni se confirmó la selección final.
+- Hallazgos: S3 (BioBioChile) contiene plantilla y avisos genéricos, aunque fue marcado como texto disponible; S2 (Chilevisión) muestra fecha extraída incompatible; S5 tiene texto parcial de 12.000 caracteres. El evento mostró identificadores técnicos en sus incertidumbres. Estos defectos no se corrigieron en este cierre.
+- El agente propuso excluir S2 y S3, pero no lo ejecutó. No afirmar que la respuesta final utilizó solo tres fuentes.
+- La herramienta de control del navegador se detuvo al no poder verificar la URL en Windows. Esto no demuestra una avería de la aplicación; la usuaria pudo continuar.
+- Antes del ensayo se comprobó un límite mensual USD 1 con bloqueo. El último estado remoto observado tenía AI_ENABLED=true y BUDGET_READY=true. No se verificaron gasto final ni desactivación posterior. Los valores false en wrangler.jsonc son configuración local, no prueba del estado remoto.
+
+Pendiente de aceptación: revisar respuesta, citas y omisiones reales; exportar y recuperar el archivo completo; verificar presupuesto disponible, estado del servidor y acceso desde el equipo de Loreto. No se repitieron pruebas de código ni llamadas API en este cierre documental. Ver LIVE-001, QA-001 y ACCESS-001.
+
+
+## Resumen inicial y pregunta inversa — 29 de octubre de 2026
+
+- 16 módulos comprobados, 35 pruebas aprobadas y build estático completo con Node 24.19.0.
+- Pruebas sin red externa: búsqueda con pregunta corta; URLs verificadas; reemplazo de artículos bloqueados, descripciones y plantillas; máximo dos rondas; aviso cuando no se logran cuatro; resumen firmado; comparación con dos fuentes; pregunta inversa que distingue el resumen derivado y rechaza citas de medios desmarcados.
+- Sesión: logo/Nueva búsqueda conservan acceso; cancelación conserva trabajo; el diálogo conectado solo ofrece desconectar; recarga revalida la sesión; desactivación explícita elimina la credencial de sessionStorage. Exportación sin credenciales; archivos v2 y lectura de v1 comprobados.
+- Navegador integrado en 127.0.0.1:4175: recorrido ficticio completo, cita local, pregunta propuesta, descarga solicitada, regreso por logo, recarga manteniendo conexión y menú conectado. Consola sin errores ni advertencias observados. No se enviaron llamadas a OpenAI.
+- Móvil: ambas vistas medidas con ancho efectivo 341 px, sin desbordamiento horizontal. El navegador aplica escala a la dimensión solicitada. No se certifica accesibilidad ni lectura en proyector físico.
+- Worker compilado desde la copia temporal por restricciones de lectura de OneDrive. Versión publicada a86a11b7-3a51-42d4-8de2-d028518ac267. Se usó configuración temporal sin vars y --keep-vars; consulta de la versión confirma AI_ENABLED=true, BUDGET_READY=true, modelo y origen conservados. No se alteraron secretos ni presupuesto.
+- Capturas privadas: output/inverse-summary.png y output/inverse-question.png. Son datos ficticios etiquetados; no se incluyen en dist.
+- Límite: no se repitió un ensayo real de pago con este nuevo esquema. La detección de plantillas es heurística y los metadatos de fechas pueden contener errores. Las pruebas no garantizan cuatro fuentes legibles para toda noticia.

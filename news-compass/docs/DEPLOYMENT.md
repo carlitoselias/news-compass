@@ -54,18 +54,18 @@ El workflow publica solo `news-compass/dist/`. No incluye fuentes del servidor, 
 Solo después de la autorización específica:
 - Verificar el límite de USD 1 en API Platform.
 - Activar `BUDGET_READY=true` y `AI_ENABLED=true` en la configuración remota del Worker.
-- Volver a conectar la interfaz para actualizar el estado.
-- Hacer una búsqueda con una noticia real nueva; seleccionar fuentes; generar respuesta; analizar omisiones.
+- Recargar la interfaz para comprobar el estado. La conexión por pestaña se conserva; exportar antes el trabajo si existe.
+- Hacer una búsqueda con pregunta, enlace o texto; revisar el resumen citado, fuentes y comparación; seleccionar publicaciones y proponer una pregunta en la segunda pantalla.
 - Comprobar fragmentos y enlaces manualmente.
 - Guardar el JSON y comprobar su recuperación con la IA desconectada.
 - Revisar el gasto real en el panel; no deducir el coste solo del número de solicitudes.
 - Volver a desactivar `AI_ENABLED` hasta la charla.
 
-La configuración versionada permanece en false. Un despliegue posterior con esa configuración vuelve a desactivar las llamadas: revisar este estado antes del evento.
+La configuración versionada permanece en false. Un despliegue con esa configuración vuelve a desactivar las llamadas. Para una actualización que deba conservar el estado remoto, usar una copia temporal de la configuración sin la propiedad vars y desplegar con --keep-vars. Los secretos no se eliminan. Verificar después las variables públicas de la versión publicada; no suponer que --keep-vars ignora valores explícitos del archivo.
 
 ## 5. Durante y después de la charla
 
-Elevar el límite acumulado a USD 10 solo si sigue autorizado. Abrir la demo y probar la conexión, sin hacer una búsqueda de cortesía. Cada búsqueda puede requerir dos llamadas al modelo; generar y examinar omisiones son operaciones adicionales. El gate permite una operación simultánea y hasta 60 operaciones al día (UTC), además del límite monetario.
+Elevar el límite acumulado a USD 10 solo si sigue autorizado. Abrir la demo y probar la conexión, sin hacer una búsqueda de cortesía. Cada búsqueda requiere dos llamadas al modelo, o tres si se buscan reemplazos. Proponer una pregunta es una llamada adicional sin búsqueda web. El gate permite una operación simultánea y hasta 60 operaciones al día (UTC), además del límite monetario.
 
 Si hay un error no se reintenta automáticamente. Una interrupción puede haber consumido crédito; esperar antes de hacer otro intento. Al terminar, poner `AI_ENABLED=false` y revocar el código de acceso o retirar el Worker si ya no se necesita.
 
