@@ -95,3 +95,6 @@ Pendiente de aceptación: revisar respuesta, citas y omisiones reales; exportar 
 - Worker compilado desde la copia temporal por restricciones de lectura de OneDrive. Versión publicada a86a11b7-3a51-42d4-8de2-d028518ac267. Se usó configuración temporal sin vars y --keep-vars; consulta de la versión confirma AI_ENABLED=true, BUDGET_READY=true, modelo y origen conservados. No se alteraron secretos ni presupuesto.
 - Capturas privadas: output/inverse-summary.png y output/inverse-question.png. Son datos ficticios etiquetados; no se incluyen en dist.
 - Límite: no se repitió un ensayo real de pago con este nuevo esquema. La detección de plantillas es heurística y los metadatos de fechas pueden contener errores. Las pruebas no garantizan cuatro fuentes legibles para toda noticia.
+
+
+Publicación: commit f232aa6 y GitHub Actions 40975634414 completaron comprobación, 35 pruebas, build y Pages. La portada pública muestra la entrada mínima, el footer solicitado y el diálogo con el Worker correcto. Consola pública sin errores ni advertencias observados. /health del Worker devuelve versión 2 y capacidades overview, source-replacement y suggest. No se introdujo el token real ni se hizo un ensayo de pago en esta verificación.
