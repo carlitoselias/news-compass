@@ -51,7 +51,13 @@ export function validateArchive(data) {
     if (a.analysis) for (const key of ['facts', 'voices', 'context', 'focus', 'agency']) validateEvidence(a.analysis[key], [a]);
   }
   for (const key of ['agreements', 'differences', 'contradictions']) validateEvidence(c.comparison?.[key] ?? [], c.articles);
+  if (data.question !== undefined && (typeof data.question !== 'string' || data.question.length > 1200)) throw new Error('La pregunta guardada no es válida.');
+  if (data.selectedIds !== undefined) {
+    if (!Array.isArray(data.selectedIds)) throw new Error('La selección guardada no es válida.');
+    if (data.selectedIds.length) selectedArticles(c, data.selectedIds);
+  }
   if (data.answer) {
+    if (data.answer.question !== undefined && (typeof data.answer.question !== 'string' || data.answer.question.length > 1200)) throw new Error('La pregunta de la respuesta no es válida.');
     const selected = selectedArticles(c, data.answer.selectedIds);
     validateEvidence(data.answer.claims, selected);
     if (data.omissions) {
