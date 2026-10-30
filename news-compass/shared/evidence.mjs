@@ -1,4 +1,10 @@
 export const normalize = value => String(value ?? '').replace(/\s+/gu, ' ').trim();
+export function validateHeadline(value) {
+  if (typeof value !== 'string') throw new Error('Falta el titular del resumen.');
+  const headline = normalize(value);
+  if (!headline || headline.length > 110) throw new Error('El titular debe tener entre 1 y 110 caracteres.');
+  return headline;
+}
 export function publicURL(value) {
   const u = new URL(value);
   const host = u.hostname.toLowerCase();
@@ -38,7 +44,7 @@ export function selectedArticles(corpus, ids) {
 export function summarySource(corpus) {
   if (!corpus.overview?.sections?.length) return null;
   return { id: 'ai-summary', title: 'Resumen inicial de IA', medium: 'IA · contenido derivado',
-    text: corpus.overview.sections.map(s => s.heading + '\n' + s.claims.map(c => c.text).join('\n')).join('\n\n'),
+    text: [corpus.overview.headline, ...corpus.overview.sections.map(s => s.heading + '\n' + s.claims.map(c => c.text).join('\n'))].filter(Boolean).join('\n\n'),
     access: 'read' };
 }
 export function validateCoverage(coverage, articles, summary) {
@@ -80,6 +86,7 @@ export function validateArchive(data) {
     }
   }
   if (c.overview) {
+    if (c.overview.headline !== undefined) validateHeadline(c.overview.headline);
     if (!Array.isArray(c.overview.sections) || !c.overview.sections.length || c.overview.sections.length > 6) throw new Error('Resumen no válido.');
     for (const section of c.overview.sections) {
       if (typeof section.heading !== 'string' || !section.heading.trim()) throw new Error('Falta una arista del resumen.');

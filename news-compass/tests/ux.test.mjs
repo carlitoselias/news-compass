@@ -10,7 +10,7 @@ const script=(await readFile(new URL('../web/app.mjs',import.meta.url),'utf8')).
 const tick=()=>new Promise(r=>setImmediate(r));
 function fixture() {
   const c=corpus(); c.articles.push(article('s3'),article('s4'));
-  c.overview={sections:[{heading:'Apertura',claims:[item()]}]};
+  c.overview={headline:'Una biblioteca gratuita abre sus puertas al barrio',sections:[{heading:'Apertura',claims:[item()]}]};
   c.comparison={agreements:[{topic:'Fecha de apertura',positions:[{text:'Ambos anuncian el viernes.',evidence:[item().evidence[0],item('s2').evidence[0]]}]}],differences:[]};
   return c;
 }
@@ -60,6 +60,15 @@ test('summary precedes source cards and comparisons name topic and publications'
   assert.doesNotMatch(ui.$('comparison-content').textContent,/Contradicciones/);
   const boxes=[...ui.document.querySelectorAll('[data-source]')];assert.equal(new Set(boxes.map(b=>b.getAttribute('aria-label'))).size,4);
 });
+test('editorial headline replaces search scope and older long scopes are not rendered as headlines',()=>{
+  const ui=setup();ui.load();
+  ui.run("state.corpus.event.name='Acceso al agua potable en Chile: disponibilidad hídrica, continuidad del suministro y abastecimiento rural. Seguimiento de julio a octubre de 2026, con antecedentes de 2023 y 2024; corte al 30 de octubre de 2026.'; render();");
+  assert.equal(ui.$('overview-content').querySelector('h1').textContent,'Una biblioteca gratuita abre sus puertas al barrio');
+  ui.run("delete state.corpus.overview.headline; render();");
+  assert.equal(ui.$('overview-content').querySelector('h1').textContent,'Resumen de la noticia');
+  assert.equal(ui.calls.length,0);
+});
+
 test('citations expand exact evidence locally without requests',()=>{
   const ui=setup();ui.load();ui.$('overview-content').querySelector('.citation').click();
   assert.equal(ui.$('overview-content').querySelector('details').open,true);assert.equal(ui.calls.length,0);
@@ -87,7 +96,7 @@ test('new archives preserve overview, proposal, edited question and selection wi
   ui.run("state.suggestion=proposal;state.draftQuestion='¿Cuándo abre y para quién?';render()");ui.$('export').click();
   const text=await ui.blobs[0].text(),data=JSON.parse(text);validateArchive(data);
   assert.equal(data.suggestion.coverage.retained.length,1);
-  assert.ok(data.corpus.overview);assert.equal(data.question,'¿Cuándo abre y para quién?');assert.equal(data.suggestion.question,'¿Cuándo abre?');
+  assert.equal(data.corpus.overview.headline,'Una biblioteca gratuita abre sus puertas al barrio');assert.equal(data.question,'¿Cuándo abre y para quién?');assert.equal(data.suggestion.question,'¿Cuándo abre?');
   assert.ok(!text.includes('test-access'));assert.equal(data.base,undefined);
   const restored=setup();restored.$('import-file').files=[{size:text.length,text:async()=>text}];
   restored.$('import-file').dispatchEvent(new restored.window.Event('change'));await tick();

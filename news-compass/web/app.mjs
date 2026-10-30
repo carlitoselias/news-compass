@@ -77,7 +77,9 @@ function renderOverview() {
   const root=$('overview-content'); root.replaceChildren();
   if(!state.corpus) return;
   const c=state.corpus, sheet=el('article',undefined,'overview');
-  sheet.append(el('p','RESUMEN DE IA','eyebrow'),el('h1',c.event.name));
+  // Older runs have no editorial headline. Never turn a long search scope into one.
+  const headline=c.overview?.headline || (c.event.name.length<=110 ? c.event.name : 'Resumen de la noticia');
+  sheet.append(el('p','RESUMEN DE IA','eyebrow'),el('h1',headline));
   if(c.searchNotice) sheet.append(el('p',c.searchNotice,'notice'));
   if(c.overview?.sections) {
     for(const section of c.overview.sections) {

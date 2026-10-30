@@ -11,7 +11,7 @@ function response(value,articles=[]) {
   if(articles.length) r.output.unshift({type:'web_search_call',action:{sources:articles.map(a=>({url:a.url}))}});
   return Response.json(r);
 }
-const overview=articles=>({sections:[{heading:'Apertura',claims:[item(articles[0].id)]}],agreements:[],differences:[]});
+const overview=articles=>({headline:'Una biblioteca gratuita abre sus puertas al barrio',sections:[{heading:'Apertura',claims:[item(articles[0].id)]}],agreements:[],differences:[]});
 test('search uses only tool URLs, accepts short questions and signs summary in the corpus',async()=>{
   const candidates=[1,2,3,4].map(n=>article('s'+n));let calls=0;
   const result=await execute('search',{input:'¿Qué pasó?'},env,()=>{},async(url,options)=>{
@@ -24,6 +24,9 @@ test('search uses only tool URLs, accepts short questions and signs summary in t
     assert.ok(candidates.some(a=>a.url===url));return new Response(html,{headers:{'content-type':'text/html'}});
   });
   assert.equal(result.corpus.articles.length,4);assert.equal(calls,6);assert.equal(result.corpus.receipts.length,2);
+  assert.equal(result.corpus.overview.headline,'Una biblioteca gratuita abre sus puertas al barrio');
+  assert.notEqual(result.corpus.overview.headline,result.corpus.event.name);
+  assert.ok(summarySource(result.corpus).text.startsWith(result.corpus.overview.headline));
   assert.ok(result.corpus.overview.sections[0].claims.length);await verifySigned(result.corpus,env.OPENAI_API_KEY);
 });
 test('inaccessible, description-only and boilerplate sources are replaced with accessible reserves',async()=>{

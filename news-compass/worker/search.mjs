@@ -1,4 +1,4 @@
-import { normalize, publicURL, validateEvidence } from '../shared/evidence.mjs';
+import { normalize, publicURL, validateEvidence, validateHeadline } from '../shared/evidence.mjs';
 import { fetchArticle } from './articles.mjs';
 import { modelRequest, discoveredURLs, signed, UserError } from './service.mjs';
 import { searchSchema, overviewSchema } from './schema.mjs';
@@ -47,13 +47,14 @@ export async function searchNews(input, env, emit, fetcher) {
   if (!articles.length) throw new UserError('No encontramos artículos con texto accesible tras buscar alternativas. Prueba con una pregunta más precisa.', 422);
   emit('Escribiendo el resumen y comparando las fuentes por temas…');
   const analysis = await modelRequest(env,
-    'Usa EXCLUSIVAMENTE los textos suministrados. sections: resumen de 3 a 5 aristas del tema; cada sección tiene heading corto y 1 o 2 claims citados. Máximo 350 palabras entre todas las claims. Atribuye cifras y declaraciones, conserva dudas y distingue fechas. agreements y differences: hasta 4 temas por categoría. Cada topic nombra UN concepto concreto (ejemplo: Causa del incidente). positions muestra qué sostiene cada fuente o grupo de fuentes mediante text y evidence. Para coincidencias, aporta evidencia de al menos dos fuentes. Para diferencias, al menos dos posiciones respaldadas por fuentes distintas. Explica si difieren en cifras, explicación o énfasis; no interpretes falta de mención como desacuerdo. Si hay contradicciones, preséntalas como diferencias sin resolverlas. Cada sourceId debe pertenecer a los artículos suministrados.',
+    'Usa EXCLUSIVAMENTE los textos suministrados. headline: escribe UN TITULAR periodístico en español, de preferencia entre 6 y 12 palabras y nunca más de 110 caracteres. Expresa una sola idea principal respaldada por las claims del resumen. No copies event.name: describe el alcance de búsqueda, no es un titular. No añadas fechas, años, periodos, cortes temporales, listas de aristas, subtítulos ni punto final. No combines acontecimientos distintos en un hecho nuevo, no exageres ni presentes una previsión como certeza. Para un tema amplio, identifica su eje común sin inventar un acontecimiento único. Deja el contexto temporal y los detalles en las secciones. sections: resumen de 3 a 5 aristas del tema; cada sección tiene heading corto y 1 o 2 claims citados. Máximo 350 palabras entre todas las claims. Atribuye cifras y declaraciones, conserva dudas y distingue fechas. agreements y differences: hasta 4 temas por categoría. Cada topic nombra UN concepto concreto (ejemplo: Causa del incidente). positions muestra qué sostiene cada fuente o grupo de fuentes mediante text y evidence. Para coincidencias, aporta evidencia de al menos dos fuentes. Para diferencias, al menos dos posiciones respaldadas por fuentes distintas. Explica si difieren en cifras, explicación o énfasis; no interpretes falta de mención como desacuerdo. Si hay contradicciones, preséntalas como diferencias sin resolverlas. Cada sourceId debe pertenecer a los artículos suministrados.',
     overviewSchema, { input, event, articles: articles.map(({ id, title, date, medium, text, url, access }) => ({ id, title, date, medium, text, url, access })) }, { fetcher });
   receipts.push(analysis.receipt);
+  const headline = validateHeadline(analysis.value.headline);
   const sections = validateSections(analysis.value.sections, articles);
   const comparison = { agreements: validateTopics(analysis.value.agreements, articles, false), differences: validateTopics(analysis.value.differences, articles, true) };
   return { corpus: await signed({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), input, event, articles,
-    overview: { sections }, comparison, discarded, searchNotice: articles.length < 4 ? 'Solo encontramos ' + articles.length + ' publicaciones con texto útil tras dos rondas. El resumen tiene una cobertura limitada.' : '', receipts }, env.OPENAI_API_KEY) };
+    overview: { headline, sections }, comparison, discarded, searchNotice: articles.length < 4 ? 'Solo encontramos ' + articles.length + ' publicaciones con texto útil tras dos rondas. El resumen tiene una cobertura limitada.' : '', receipts }, env.OPENAI_API_KEY) };
 }
 export function validateSections(sections, articles) {
   if (!Array.isArray(sections) || !sections.length || sections.length > 6) throw new UserError('El resumen no contiene secciones válidas.', 502);
