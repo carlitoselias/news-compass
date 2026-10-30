@@ -33,19 +33,19 @@
     <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
     <div id="error" class="error" role="alert" hidden></div>
     <section id="workspace" class="workspace" aria-label="Análisis de la noticia" hidden>
-      <div class="result-toolbar"><nav aria-label="Vistas"><button id="show-coverage" class="view-button active" aria-current="page">La noticia</button><button id="show-question" class="view-button">La pregunta</button></nav><button id="export" class="quiet">Guardar ejecución ↓</button></div>
+      <div class="result-toolbar"><nav aria-label="Vistas"><button id="show-coverage" class="view-button active" aria-current="page">La noticia</button><button id="show-question" class="view-button">Explorar</button></nav><button id="export" class="quiet">Guardar ejecución ↓</button></div>
       <p id="execution-label" class="execution-label"></p>
       <section id="coverage" tabindex="-1">
         <div id="overview-content"></div>
         <div id="sources-content"></div>
         <div id="comparison-content"></div>
-        <div class="next-screen"><div><p class="eyebrow">CAMBIA EL PUNTO DE VISTA</p><h2>Si esto es la respuesta,<br>¿cuál sería la pregunta?</h2></div><button id="continue" class="primary">Explorar la pregunta <span aria-hidden="true">→</span></button></div>
+        <div class="next-screen"><div><p class="eyebrow">SIGUE EXPLORANDO</p><h2>Hay más detrás<br>del resumen.</h2></div><button id="continue" class="primary">Explorar la cobertura <span aria-hidden="true">→</span></button></div>
       </section>
       <section id="question-screen" tabindex="-1" hidden>
         <button id="back" class="quiet">← Volver a la noticia</button>
-        <div class="question-intro"><p class="eyebrow">DE LA RESPUESTA A LA PREGUNTA</p><h1>¿Qué pregunta<br>conecta estas fuentes?</h1><p>La IA propone una pregunta a partir de tu selección y del resumen inicial.</p></div>
-        <div id="question-materials"></div>
-        <div class="suggest-action"><button id="suggest" class="primary">Proponer una pregunta <span aria-hidden="true">↗</span></button><p id="suggest-help" class="small-note"></p></div>
+        <div class="question-intro"><p class="eyebrow">UNA MIRADA MÁS AMPLIA</p><h1>¿Qué conecta<br>estas fuentes?</h1><p>Explora el enfoque de la cobertura y los detalles que el resumen conserva, deja fuera o presenta con otros matices.</p></div>
+        <p id="analysis-scope" class="small-note"></p>
+        <div class="suggest-action"><button id="suggest" class="primary">Analizar la cobertura <span aria-hidden="true">↗</span></button><p id="suggest-help" class="small-note"></p></div>
         <div id="suggestion-content" tabindex="-1"></div>
       </section>
     </section>

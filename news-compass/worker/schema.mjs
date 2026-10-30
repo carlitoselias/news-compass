@@ -17,4 +17,4 @@ export const omissionsSchema = obj({ omissions: observations, context: observati
 export const section = obj({ heading: str, claims: observations });
 export const comparisonTopic = obj({ topic: str, positions: observations });
 export const overviewSchema = obj({ sections: arr(section), agreements: arr(comparisonTopic), differences: arr(comparisonTopic) });
-export const questionSchema = obj({ question: str, rationale: observations });
+export const questionSchema = obj({ question: str, rationale: observations, coverage: obj({ retained: observations, omitted: observations, reframed: observations }) });

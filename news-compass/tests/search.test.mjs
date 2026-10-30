@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execute, verifySigned, signed } from '../worker/service.mjs';
 import { validateTopics } from '../worker/search.mjs';
-import { summarySource, validateArchive } from '../shared/evidence.mjs';
+import { summarySource, validateArchive, validateCoverage } from '../shared/evidence.mjs';
 import { article, item, corpus, responseEnvelope } from './fixtures.mjs';
 const env={AI_ENABLED:'true',BUDGET_READY:'true',OPENAI_API_KEY:'test-only-key',OPENAI_MODEL:'test-model'};
 const html='<html><head><title>Biblioteca de prueba</title></head><body><article><p>'+article().text.repeat(4)+'</p></article></body></html>';
@@ -72,10 +72,11 @@ test('inverse question gets selected articles plus a labelled derived summary, w
   const signedCorpus=await signed(c,env.OPENAI_API_KEY);let sent;
   const result=await execute('suggest',{corpus:signedCorpus,selectedIds:['s1']},env,()=>{},async(url,options)=>{
     sent=JSON.parse(options.body);
-    return response({question:'¿Cuándo abrirá la biblioteca?',rationale:[item(),{text:'El resumen menciona la apertura.',evidence:[{sourceId:'ai-summary',quote:item().text}]}]});
+    return response({question:'¿Cuándo abrirá la biblioteca?',rationale:[item(),{text:'El resumen menciona la apertura.',evidence:[{sourceId:'ai-summary',quote:item().text}]}],coverage:{retained:[{text:'El resumen conserva la fecha de apertura.',evidence:[item().evidence[0],{sourceId:'ai-summary',quote:item().text}]}],omitted:[],reframed:[]}});
   });
   const input=JSON.parse(sent.input);assert.equal(sent.tools,undefined);assert.deepEqual(input.articles.map(a=>a.id),['s1']);
   assert.equal(input.derivedSummary.id,'ai-summary');assert.deepEqual(input.derivedSummary.provenance[0].sourceIds,['s2']);
+  assert.equal(result.suggestion.coverage.retained.length,1);
   await verifySigned(result.suggestion,env.OPENAI_API_KEY);
   validateArchive({format:'news-compass',version:2,corpus:c,suggestion:result.suggestion});
 });

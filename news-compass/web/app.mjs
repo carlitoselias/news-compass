@@ -33,8 +33,8 @@ function controls() {
   $('news-input').disabled=state.busy; $('import').disabled=state.busy;
   $('export').disabled=state.busy || !state.corpus;
   $('suggest').disabled=state.busy || !state.enabled || !state.selected.size || state.saved || !state.corpus?.overview;
-  $('suggest').textContent=state.suggestion?'Proponer otra pregunta ↗':'Proponer una pregunta ↗';
-  $('suggest-help').textContent=state.saved?'Ejecución guardada · solo lectura.':!state.corpus?.overview?'Este archivo antiguo no contiene un resumen inicial.':!state.selected.size?'Selecciona al menos una fuente en «La noticia».':!state.enabled?'Conecta la IA para proponer una pregunta.':'Usa tu selección y el resumen inicial. Esta acción consume API.';
+  $('suggest').textContent='Analizar la cobertura ↗';
+  $('suggest-help').textContent=state.saved?'Ejecución guardada · solo lectura.':!state.corpus?.overview?'Este archivo antiguo no contiene un resumen inicial.':!state.selected.size?'Selecciona al menos una fuente en «La noticia».':!state.enabled?'Conecta la IA para analizar la cobertura.':'';
   for(const box of document.querySelectorAll('[data-source]')) box.disabled=state.busy||state.saved;
   if($('suggested-question')) $('suggested-question').disabled=state.busy||state.saved;
   $('workspace').setAttribute('aria-busy',String(state.busy));
@@ -77,7 +77,7 @@ function renderOverview() {
   const root=$('overview-content'); root.replaceChildren();
   if(!state.corpus) return;
   const c=state.corpus, sheet=el('article',undefined,'overview');
-  sheet.append(el('p','RESUMEN DE IA · CON FUENTES','eyebrow'),el('h1',c.event.name));
+  sheet.append(el('p','RESUMEN DE IA','eyebrow'),el('h1',c.event.name));
   if(c.searchNotice) sheet.append(el('p',c.searchNotice,'notice'));
   if(c.overview?.sections) {
     for(const section of c.overview.sections) {
@@ -88,8 +88,25 @@ function renderOverview() {
     sheet.append(el('p','Respuesta conservada de una ejecución anterior.','small-note'));
     for(const claim of state.answer.claims) sheet.append(observation(claim));
   } else sheet.append(el('p','Este archivo conserva las fuentes, pero no incluye un resumen inicial.','notice'));
-  sheet.append(el('p','Síntesis de las fuentes encontradas. La selección de abajo se usa para proponer la pregunta.','small-note'));
+  sheet.append(el('p','Elige las fuentes que quieras incluir en el análisis.','small-note'));
   root.append(sheet);
+}
+function publicationDate(value) {
+  const match = typeof value === 'string' && value.trim().match(/^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/);
+  if (!match) return 'Fecha no disponible';
+  const [,year,month,day,hour] = match;
+  const calendar = new Date(Date.UTC(Number(year),Number(month)-1,Number(day)));
+  if (calendar.getUTCFullYear()!==Number(year) || calendar.getUTCMonth()!==Number(month)-1 || calendar.getUTCDate()!==Number(day)) return 'Fecha no disponible';
+  const hasTime = hour !== undefined;
+  const zoned = hasTime && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value.trim());
+  const date = hasTime ? new Date(value.trim().replace(' ','T') + (zoned ? '' : 'Z')) : calendar;
+  if (!Number.isFinite(date.getTime())) return 'Fecha no disponible';
+  const parts = new Intl.DateTimeFormat('es-CL', {
+    timeZone: zoned ? 'America/Santiago' : 'UTC', day:'numeric', month:'long', year:'numeric',
+    ...(hasTime ? {hour:'2-digit',minute:'2-digit',hourCycle:'h23'} : {})
+  }).formatToParts(date);
+  const part = type => parts.find(p=>p.type===type)?.value;
+  return part('day')+' de '+part('month')+' '+part('year')+(hasTime ? ' · '+part('hour')+':'+part('minute') : '');
 }
 function renderSources() {
   const root=$('sources-content'); root.replaceChildren(); if(!state.corpus) return;
@@ -103,9 +120,9 @@ function renderSources() {
     const label=el('label',undefined,'select-source'), box=el('input'); box.type='checkbox'; box.dataset.source=a.id; box.checked=state.selected.has(a.id);
     box.setAttribute('aria-label','Seleccionar '+a.id.toUpperCase()+' · '+a.medium+' · '+a.title);
     box.addEventListener('change',()=>{ box.checked?state.selected.add(a.id):state.selected.delete(a.id); state.dirty=true; renderSources(); renderQuestion(); controls(); document.querySelector('[data-source="'+a.id+'"]').focus(); });
-    label.append(box,document.createTextNode('Para la pregunta')); top.append(label);
+    label.append(box,document.createTextNode('Para el análisis')); top.append(label);
     const title=el('h3'); title.append(link(a.title,a.url));
-    card.append(top,title,el('p',a.date||'Fecha no disponible','metadata'));
+    card.append(top,title,el('p',publicationDate(a.date),'metadata'));
     if(a.access==='partial') card.append(el('p','Lectura parcial · '+a.accessNote,'metadata'));
     const details=el('details'); details.append(el('summary','Leer texto de la fuente'),el('div',a.text,'read-text'));
     card.append(details); grid.append(card);
@@ -115,15 +132,15 @@ function renderSources() {
 function renderComparison() {
   const root=$('comparison-content'); root.replaceChildren(); if(!state.corpus) return;
   const section=el('section',undefined,'comparison');
-  section.append(el('p','LAS COBERTURAS, FRENTE A FRENTE','eyebrow'),el('h2','Dónde coinciden. Dónde difieren.'));
-  const grid=el('div',undefined,'comparison-columns');
+  section.append(el('p','LAS COBERTURAS, FRENTE A FRENTE','eyebrow'));
+  const grid=el('div',undefined,'comparison-sections');
   for(const [key,title] of [['agreements','Coincidencias'],['differences','Diferencias']]) {
-    const column=el('div'); column.append(el('h3',title));
+    const column=el('section',undefined,'comparison-group'); column.append(el('h2',key==='agreements'?'Dónde coinciden':'Dónde difieren'));
     const topics=state.corpus.comparison[key]||[];
     if(!topics.length) column.append(el('p','No se identificaron '+title.toLowerCase()+' con evidencia suficiente.','small-note'));
     for(const t of topics) {
       const card=el('article',undefined,'topic');
-      card.append(el('h4',t.topic||t.text));
+      card.append(el('h3',t.topic||t.text));
       for(const position of t.positions||[t]) {
         const names=[...new Set(position.evidence.map(e=>source(e.sourceId)?.medium||e.sourceId))];
         card.append(el('strong',names.join(' · '),'position-label'),observation(position));
@@ -135,26 +152,42 @@ function renderComparison() {
   section.append(grid); root.append(section);
 }
 function renderQuestion() {
-  const root=$('question-materials'); root.replaceChildren(); if(!state.corpus) return;
-  const chips=el('div',undefined,'materials');
-  for(const id of state.selected) chips.append(el('span',source(id).medium,'material'));
-  if(state.corpus.overview) chips.append(el('span','+ Resumen inicial de IA','material derived'));
-  root.append(chips,el('p','El resumen es material derivado de todas las fuentes iniciales, incluidas las que desmarques. No cuenta como confirmación independiente.','small-note'));
+  if(!state.corpus) return;
+  $('analysis-scope').textContent='El análisis contrasta el resumen inicial con '+state.selected.size+' fuente'+(state.selected.size===1?' seleccionada.':'s seleccionadas.');
   const result=$('suggestion-content'); result.replaceChildren();
   if(!state.suggestion) return;
-  if(!currentSuggestion()) result.append(el('p','Esta propuesta corresponde a la selección anterior. Puedes conservarla o proponer otra.','stale-note'));
+  if(!currentSuggestion()) result.append(el('p','Este análisis corresponde a la selección anterior. Vuelve a analizar para incorporar tus cambios.','stale-note'));
   const sheet=el('article',undefined,'suggested-question');
-  sheet.append(el('p','PREGUNTA PROPUESTA POR IA','eyebrow'));
+  sheet.append(el('p','PARA SEGUIR EXPLORANDO','eyebrow'));
   const label=el('label','Edita la pregunta propuesta','sr-only'); label.htmlFor='suggested-question';
   const input=el('textarea'); input.id='suggested-question'; input.rows=3; input.maxLength=1200; input.value=state.draftQuestion||state.suggestion.question; input.disabled=state.saved||state.busy;
   input.addEventListener('input',()=>{ state.draftQuestion=input.value; state.dirty=true; });
-  sheet.append(label,input,el('p','Por qué encaja la propuesta original','small-note'));
+  sheet.append(label,input,el('p','Cómo se relacionan las fuentes','small-note'));
   for(const item of state.suggestion.rationale) sheet.append(observation(item));
   result.append(sheet);
+  if (state.suggestion.coverage) {
+    const review = el('div',undefined,'coverage-review');
+    for (const [key,title,empty] of [
+      ['retained','Qué recogió el resumen','No se identificaron coincidencias respaldadas en los textos revisados.'],
+      ['omitted','Qué dejó fuera','No se identificaron omisiones respaldadas en los textos revisados.'],
+      ['reframed','Qué matizó de otra forma','No se identificaron cambios de matiz respaldados en los textos revisados.']
+    ]) {
+      const group=el('section',undefined,'review-group');
+      group.append(el('h2',title));
+      const items=state.suggestion.coverage[key];
+      if(!items.length) group.append(el('p',empty,'small-note'));
+      for(const item of items) group.append(observation(item));
+      review.append(group);
+    }
+    review.append(el('p','Esta lectura de IA se limita a los textos seleccionados. Una omisión no implica por sí sola sesgo o error.','small-note'));
+    result.append(review);
+  } else {
+    result.append(el('p','Este resultado anterior no incluye el análisis del resumen.','small-note'));
+  }
 }
 function render() {
   renderOverview(); renderSources(); renderComparison(); renderQuestion(); controls(); showView(state.view);
-  $('execution-label').textContent=state.corpus?(state.saved?'Ejecución guardada · ':'')+new Date(state.corpus.createdAt).toLocaleString('es-CL'):'';
+  $('execution-label').textContent=state.corpus?(state.saved?'Ejecución guardada · ':'')+publicationDate(state.corpus.createdAt):'';
   $('execution-label').classList.toggle('saved-banner',state.saved);
 }
 async function api(action,body) {

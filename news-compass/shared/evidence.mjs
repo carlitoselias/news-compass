@@ -41,6 +41,19 @@ export function summarySource(corpus) {
     text: corpus.overview.sections.map(s => s.heading + '\n' + s.claims.map(c => c.text).join('\n')).join('\n\n'),
     access: 'read' };
 }
+export function validateCoverage(coverage, articles, summary) {
+  if (!coverage || !summary) throw new Error('Falta el análisis del resumen.');
+  const result = {};
+  const ids = new Set(articles.map(a=>a.id));
+  for (const key of ['retained','omitted','reframed']) {
+    result[key] = validateEvidence(coverage[key], [...articles,summary], {max:6});
+    for (const item of result[key]) {
+      if (!item.evidence.some(e=>ids.has(e.sourceId))) throw new Error('El análisis requiere evidencia de una fuente seleccionada.');
+      if (key!=='omitted' && !item.evidence.some(e=>e.sourceId==='ai-summary')) throw new Error('La comparación requiere también un fragmento del resumen inicial.');
+    }
+  }
+  return result;
+}
 export function validateArchive(data) {
   if (data?.format !== 'news-compass' || ![1, 2].includes(data.version) || !data.corpus || !Array.isArray(data.corpus.articles))
     throw new Error('Este archivo no es una ejecución de News Compass compatible.');
@@ -78,6 +91,7 @@ export function validateArchive(data) {
     const sources = selectedArticles(c, data.suggestion.selectedIds), summary = summarySource(c);
     if (!summary || data.suggestion.corpusId !== c.id || typeof data.suggestion.question !== 'string' || !data.suggestion.question.trim() || data.suggestion.question.length > 1200) throw new Error('Propuesta de pregunta no válida.');
     validateEvidence(data.suggestion.rationale, [...sources, summary], { max: 3 });
+    if (data.suggestion.coverage !== undefined) validateCoverage(data.suggestion.coverage,sources,summary);
   }
   if (data.question !== undefined && (typeof data.question !== 'string' || data.question.length > 1200)) throw new Error('La pregunta guardada no es válida.');
   if (data.selectedIds !== undefined) {

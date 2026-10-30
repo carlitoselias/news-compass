@@ -67,7 +67,7 @@ test('citations expand exact evidence locally without requests',()=>{
 test('question view distinguishes derived summary and preserves old proposal after source change',()=>{
   const ui=setup();ui.load();ui.context.proposal={corpusId:'test-corpus',selectedIds:['s1','s2','s3','s4'],question:'¿Cuándo abrirá?',rationale:[item()]};
   ui.run("state.suggestion=proposal; state.draftQuestion=proposal.question; render();");
-  ui.$('continue').click();assert.equal(ui.$('question-screen').hidden,false);assert.match(ui.$('question-materials').textContent,/No cuenta como confirmación independiente/);
+  ui.$('continue').click();assert.equal(ui.$('question-screen').hidden,false);assert.match(ui.$('analysis-scope').textContent,/4 fuentes seleccionadas/);
   const box=ui.document.querySelector('[data-source]');box.checked=false;box.dispatchEvent(new ui.window.Event('change'));
   assert.match(ui.$('suggestion-content').textContent,/selección anterior/);assert.equal(ui.run('state.suggestion.question'),'¿Cuándo abrirá?');
 });
@@ -83,14 +83,17 @@ test('busy state prevents duplicate requests and warns before closing',async()=>
   const event=new ui.window.Event('beforeunload',{cancelable:true});ui.window.dispatchEvent(event);assert.equal(event.defaultPrevented,true);
 });
 test('new archives preserve overview, proposal, edited question and selection without secrets',async()=>{
-  const ui=setup();ui.load();ui.context.proposal={corpusId:'test-corpus',selectedIds:['s1'],question:'¿Cuándo abre?',rationale:[item()]};
+  const ui=setup();ui.load();ui.context.proposal={corpusId:'test-corpus',selectedIds:['s1'],question:'¿Cuándo abre?',rationale:[item()],coverage:{retained:[{text:'El resumen conserva la fecha de apertura.',evidence:[item().evidence[0],{sourceId:'ai-summary',quote:item().text}]}],omitted:[],reframed:[]}};
   ui.run("state.suggestion=proposal;state.draftQuestion='¿Cuándo abre y para quién?';render()");ui.$('export').click();
   const text=await ui.blobs[0].text(),data=JSON.parse(text);validateArchive(data);
+  assert.equal(data.suggestion.coverage.retained.length,1);
   assert.ok(data.corpus.overview);assert.equal(data.question,'¿Cuándo abre y para quién?');assert.equal(data.suggestion.question,'¿Cuándo abre?');
   assert.ok(!text.includes('test-access'));assert.equal(data.base,undefined);
   const restored=setup();restored.$('import-file').files=[{size:text.length,text:async()=>text}];
   restored.$('import-file').dispatchEvent(new restored.window.Event('change'));await tick();
   assert.match(restored.$('execution-label').textContent,/Ejecución guardada/);assert.equal(restored.$('suggest').disabled,true);
+  assert.match(restored.$('suggestion-content').textContent,/Qué recogió el resumen/);
+  assert.equal(restored.$('suggestion-content').querySelectorAll('.review-group').length,3);
   assert.equal(restored.$('suggested-question').value,data.question);assert.equal(restored.calls.length,0);
 });
 test('invalid archive cannot replace current work',async()=>{

@@ -1,6 +1,6 @@
 :root { color-scheme:light; --paper:#fffdf8; --surface:#fff; --ink:#171717; --muted:#625d56; --line:#dedbd5; --accent:#c51f30; --soft:#f4f1eb; font:17px/1.6 Arial,Helvetica,sans-serif; }
 * { box-sizing:border-box; } [hidden] { display:none!important; }
-body { margin:0; background:var(--paper); color:var(--ink); min-height:100vh; display:flex; flex-direction:column; }
+body { isolation:isolate; margin:0; background:var(--paper); color:var(--ink); min-height:100vh; display:flex; flex-direction:column; }
 button,input,textarea { font:inherit; } button { cursor:pointer; } a { color:inherit; text-underline-offset:4px; }
 button,a,input,textarea,summary { touch-action:manipulation; }
 :where(button,a,input,textarea,summary,[tabindex]):focus-visible { outline:3px solid var(--accent); outline-offset:4px; }
@@ -17,6 +17,11 @@ p { margin-bottom:1rem; } ::selection { background:#f9ccd1; }
 .connection-dot { position:absolute; right:1px; bottom:1px; width:10px; height:10px; border:2px solid var(--paper); border-radius:50%; background:#8b857b; } .connected .connection-dot { background:#257248; }
 main { flex:1; width:min(100% - 48px,1080px); margin:0 auto; }
 #entry-panel { display:flex; align-items:center; justify-content:center; min-height:64vh; }
+/* Decorative press collage: visible only on the initial question screen. */
+body:has(#entry-panel:not([hidden]))::before {
+  content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background:url('./press-collage.jpg') center / cover no-repeat; opacity:.3;
+}
 .search-box { width:min(100%,760px); background:var(--surface); border:1px solid #c5c0b8; border-radius:22px; padding:20px 22px 14px; box-shadow:0 8px 36px #29201b05; }
 .search-box:focus-within { border-color:var(--ink); }
 textarea { width:100%; resize:vertical; min-height:82px; max-height:320px; border:0; background:transparent; color:var(--ink); padding:4px; line-height:1.6; }
@@ -58,17 +63,16 @@ footer { text-align:center; color:var(--muted); padding:45px 20px 24px; font-siz
 input[type=checkbox] { accent-color:var(--accent); width:18px; height:18px; }
 .metadata { font-size:.73rem; color:var(--muted); margin:6px 0; } details summary { cursor:pointer; font-size:.78rem; color:var(--muted); }
 .read-text { white-space:pre-wrap; max-height:320px; overflow:auto; margin-top:16px; font-size:.85rem; line-height:1.7; }
-.comparison { margin:36px 0 50px; } .comparison-columns { display:grid; grid-template-columns:1fr 1fr; gap:36px; }
-.comparison-columns>div>h3 { font-size:.75rem; letter-spacing:.1em; text-transform:uppercase; border-top:2px solid var(--ink); padding-top:15px; margin-bottom:24px; }
+.comparison { margin:36px 0 50px; } .comparison-sections { display:flex; flex-direction:column; gap:36px; }
+.comparison-group>h2 { border-top:2px solid var(--ink); padding-top:22px; margin-bottom:28px; }
 .topic { padding-bottom:20px; margin-bottom:25px; border-bottom:1px solid var(--line); }
-.topic h4 { margin:0 0 14px; font:700 1.25rem/1.25 Georgia,serif; }
+.topic h3 { margin:0 0 14px; font:700 1.25rem/1.25 Georgia,serif; }
 .position-label { display:block; font-size:.75rem; color:var(--accent); margin-bottom:5px; }
 .topic .claim-text { font-size:.9rem; }
 .next-screen { display:flex; align-items:center; justify-content:space-between; gap:24px; border-top:1px solid var(--line); padding:45px 0; } .next-screen h2 { margin-bottom:0; }
 #question-screen { max-width:850px; margin:0 auto; } .question-intro { margin:42px 0; }
 .question-intro>p:last-child { color:var(--muted); max-width:600px; }
-.materials { display:flex; flex-wrap:wrap; gap:8px; } .material { border:1px solid var(--line); border-radius:20px; padding:6px 12px; font-size:.75rem; background:white; }
-.material.derived { background:#fff0f1; border-color:#eac7cb; }
+.coverage-review { margin-top:48px; } .review-group { border-top:1px solid var(--line); padding:28px 0 20px; } .review-group h2 { font-size:1.65rem; }
 .suggest-action { margin:30px 0; } .suggest-action p { margin:12px 0; }
 .suggested-question { border-top:3px solid var(--accent); padding:32px; background:white; border-radius:0 0 12px 12px; margin:35px 0; }
 .suggested-question textarea { font:1.7rem/1.35 Georgia,serif; min-height:130px; }
@@ -78,4 +82,4 @@ dialog::backdrop { background:#17171766; } .dialog-header { display:flex; align-
 dialog label { display:block; font-size:.85rem; margin:16px 0 8px; } dialog input { width:100%; border:1px solid #aaa49b; border-radius:7px; padding:12px; min-width:0; }
 dialog details { margin:20px 0; } .dialog-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:24px; }
 #settings-message { font-size:.85rem; margin:15px 0 0; }
-@media(max-width:650px) { :root { font-size:16px; } main { width:calc(100% - 32px); } .topbar { padding:20px 16px; } .brand { font-size:1.3rem; gap:6px; } .brand img { width:28px; height:28px; } .header-actions { gap:4px; } #new-run { font-size:.7rem; padding:8px; } .search-box { padding:16px; } #entry-panel { min-height:62vh; } .sources-grid,.comparison-columns { grid-template-columns:1fr; gap:16px; } .section-heading,.next-screen { flex-direction:column; align-items:flex-start; } .result-toolbar { flex-wrap:wrap; } .result-toolbar button { padding:8px 11px; font-size:.77rem; } .overview { margin-bottom:40px; } .source-card { padding:20px; } .suggested-question { padding:24px 15px; } .suggested-question textarea { font-size:1.4rem; } }
+@media(max-width:650px) { :root { font-size:16px; } main { width:calc(100% - 32px); } .topbar { padding:20px 16px; } .brand { font-size:1.3rem; gap:6px; } .brand img { width:28px; height:28px; } .header-actions { gap:4px; } #new-run { font-size:.7rem; padding:8px; } .search-box { padding:16px; } #entry-panel { min-height:62vh; } .sources-grid { grid-template-columns:1fr; gap:16px; } .section-heading,.next-screen { flex-direction:column; align-items:flex-start; } .result-toolbar { flex-wrap:wrap; } .result-toolbar button { padding:8px 11px; font-size:.77rem; } .overview { margin-bottom:40px; } .source-card { padding:20px; } .suggested-question { padding:24px 15px; } .suggested-question textarea { font-size:1.4rem; } }

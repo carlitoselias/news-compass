@@ -98,3 +98,13 @@ Pendiente de aceptación: revisar respuesta, citas y omisiones reales; exportar 
 
 
 Publicación: commit f232aa6 y GitHub Actions 40975634414 completaron comprobación, 35 pruebas, build y Pages. La portada pública muestra la entrada mínima, el footer solicitado y el diálogo con el Worker correcto. Consola pública sin errores ni advertencias observados. /health del Worker devuelve versión 2 y capacidades overview, source-replacement y suggest. No se introdujo el token real ni se hizo un ensayo de pago en esta verificación.
+
+## Integración de análisis de cobertura y portada editorial
+
+- Autorización: integrar todos los cambios pendientes en main y aumentar el collage al 30 %.
+- Comprobación local: 17 módulos, 38 pruebas aprobadas y build estático. Sin llamadas de pago durante esta integración.
+- El análisis contrasta las fuentes seleccionadas con el resumen: información conservada, omitida y matizada. La validación exige fragmentos literales de ambos lados para conservación y matices, y respaldo de la fuente para omisiones. Los archivos anteriores siguen siendo compatibles.
+- Fechas unificadas en español; coincidencias y diferencias en secciones verticales; textos de exploración simplificados.
+- Collage decorativo generado con ImageGen, optimizado a JPEG y limitado a la portada. Opacidad 0.3 verificada en el navegador. El cuadro de búsqueda mantiene fondo blanco.
+- Servidores locales conservados, sin reinicio ni cambio de presupuesto. Las pruebas siguen activas.
+- Esta integración no ejecuta los despliegues manuales de Pages ni de Workers.
